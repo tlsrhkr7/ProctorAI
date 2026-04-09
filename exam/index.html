@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProctorAI — 시험 응시</title>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<link rel="stylesheet" href="exam.css">
+</head>
+<body>
+
+<!-- 테두리 플래시 -->
+<div class="b-flash" id="b-flash"></div>
+
+<!-- ══════════════ 로그인 화면 ══════════════ -->
+<div id="login-screen">
+  <div class="brand">
+    <div class="brand-icon">👁</div>
+    <div class="brand-name">ProctorAI</div>
+  </div>
+  <div class="tagline">AI 기반 지능형 시험 감독 시스템</div>
+
+  <div class="login-card">
+    <label class="lbl">학번</label>
+    <input type="text" class="inp" id="l-id" placeholder="예: 2024001234">
+    <label class="lbl">이름</label>
+    <input type="text" class="inp" id="l-name" placeholder="예: 홍길동">
+    <div class="divider"></div>
+    <label class="lbl">응시할 시험 선택</label>
+    <select class="inp" id="l-exam"><option value="">-- 불러오는 중... --</option></select>
+    <button class="start-btn" onclick="startExam()">🚀 시험 시작</button>
+    <div class="notice">
+      📷 본 시험은 <strong>카메라와 마이크</strong>를 사용하여 AI가 실시간 감독합니다.<br>
+      부정행위 감지 시 경고 → 일시정지 → 강제 종료됩니다.
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ 시험 화면 ══════════════ -->
+<div id="exam-screen">
+
+  <!-- 탑바 -->
+  <div class="topbar">
+    <div class="tb-left">
+      <div class="mini-brand">ProctorAI</div>
+      <div class="exam-name-tb" id="tb-name">시험 진행 중</div>
+    </div>
+    <div class="tb-right">
+      <div class="warn-badges">
+        <div class="wb" id="wb1">1</div>
+        <div class="wb" id="wb2">2</div>
+        <div class="wb" id="wb3">3</div>
+      </div>
+      <div class="status-pill sp-ok" id="sp">
+        <div class="dot blink"></div>
+        <span id="sp-txt">정상 감독 중</span>
+      </div>
+      <div class="timer" id="timer">30:00</div>
+    </div>
+  </div>
+
+  <div class="exam-layout">
+
+    <!-- 시험지 -->
+    <div class="exam-content" id="exam-content">
+      <div class="exam-paper fi">
+        <div class="paper-hdr">
+          <div>
+            <div class="paper-title" id="p-title">시험명</div>
+            <div class="paper-sub">총 <span id="p-qcnt">0</span>문항 · <span id="p-dur">30</span>분</div>
+          </div>
+          <div class="paper-student">
+            <strong id="p-name">이름</strong>
+            <span  id="p-id">학번</span>
+          </div>
+        </div>
+        <div id="q-area"></div>
+        <button class="submit-btn" onclick="submitExam()">답안 제출 →</button>
+        <div style="height:36px"></div>
+      </div>
+    </div>
+
+    <!-- 감독 패널 -->
+    <div class="mon-panel">
+      <div class="mp-section">
+        <div class="mp-title">📷 실시간 감독 카메라</div>
+        <div class="cam-wrap">
+          <video id="cam-vid" autoplay playsinline muted></video>
+          <canvas id="cam-cvs"></canvas>
+          <div class="cam-badge">
+            <div class="dot blink" style="background:var(--ok)"></div>
+            <span id="cam-st">감지 중</span>
+          </div>
+        </div>
+        <div class="gaze-bar-bg">
+          <div class="gaze-bar-fill" id="gaze-fill" style="width:100%;background:var(--ok)"></div>
+        </div>
+        <div class="gaze-lbl" id="gaze-lbl">시선 정상</div>
+      </div>
+
+      <div class="mp-section">
+        <div class="mp-title">📊 감독 통계</div>
+        <div class="stats-grid">
+          <div class="sbox"><div class="sbox-v g" id="st-focus">100%</div><div class="sbox-l">시선 집중도</div></div>
+          <div class="sbox"><div class="sbox-v g" id="st-warns">0회</div><div class="sbox-l">경고 횟수</div></div>
+          <div class="sbox"><div class="sbox-v"   id="st-away" >0s</div><div class="sbox-l">총 이탈 시간</div></div>
+          <div class="sbox"><div class="sbox-v"   id="st-voice">0회</div><div class="sbox-l">음성 감지</div></div>
+        </div>
+      </div>
+
+      <div class="mp-section">
+        <div class="mp-title">🎙 음성 모니터링</div>
+        <div class="voice-row">
+          <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+          <div class="wave-bar"></div><div class="wave-bar"></div>
+          <span style="margin-left:7px;font-size:11px;color:var(--muted)" id="v-status">대기 중...</span>
+        </div>
+        <div class="voice-txt" id="v-txt">인식된 음성이 여기 표시됩니다</div>
+      </div>
+
+      <div class="mp-section" style="flex:1;overflow:hidden;">
+        <div class="mp-title">📋 이벤트 로그</div>
+        <div class="log-list" id="log-list"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ 경고 오버레이 ══════════════ -->
+<div class="overlay" id="ov-warn">
+  <div class="ov-icon">⚠️</div>
+  <div class="ov-title w" id="ov-warn-title">시선 이탈 경고</div>
+  <div class="ov-sub"     id="ov-warn-msg">화면에서 시선이 이탈되었습니다.</div>
+  <button class="ov-btn ob-p" onclick="dismissWarn()">확인 — 계속 응시합니다</button>
+</div>
+
+<!-- ══════════════ AI 면담 오버레이 ══════════════ -->
+<div class="overlay" id="ov-chat">
+  <div class="ov-icon">🤖</div>
+  <div class="ov-title w">시험 일시정지 — AI 면담</div>
+  <div class="ov-sub">의심 행위가 반복 감지되었습니다. AI 감독관과 면담 후 재개 가능합니다.</div>
+  <div class="chat-box">
+    <div class="chat-hdr">
+      <div class="ai-av">🛡</div>
+      <div>
+        <div style="font-size:13px;font-weight:600">ProctorAI 감독관</div>
+        <div style="font-size:10px;color:var(--muted)">AI 면담 · 응답 필수</div>
+      </div>
+    </div>
+    <div class="chat-msgs" id="chat-msgs"></div>
+    <div class="chat-inp-row">
+      <input type="text" class="chat-inp" id="chat-inp"
+             placeholder="답변 입력..." onkeydown="if(event.key==='Enter')sendChat()">
+      <button class="chat-send" onclick="sendChat()">전송</button>
+    </div>
+  </div>
+  <button class="ov-btn ob-g" id="resume-btn" style="display:none" onclick="resumeChat()">
+    ✅ 면담 완료 — 시험 재개
+  </button>
+</div>
+
+<!-- ══════════════ 완료/종료 오버레이 ══════════════ -->
+<div class="overlay" id="ov-done">
+  <div class="ov-icon" id="done-icon">✅</div>
+  <div class="ov-title g" id="done-title">시험 제출 완료</div>
+  <div class="ov-sub"     id="done-sub">답안이 성공적으로 제출되었습니다!</div>
+  <div class="done-grid">
+    <div class="done-stat"><div class="ds-val d" id="dn-warns">0</div><div class="ds-lbl">총 경고 횟수</div></div>
+    <div class="done-stat"><div class="ds-val w" id="dn-away">0s</div><div class="ds-lbl">총 이탈 시간</div></div>
+    <div class="done-stat"><div class="ds-val"   id="dn-voice">0</div><div class="ds-lbl">음성 감지</div></div>
+    <div class="done-stat"><div class="ds-val g" id="dn-time">00:00</div><div class="ds-lbl">응시 시간</div></div>
+  </div>
+  <button class="ov-btn ob-ghost" onclick="location.reload()">← 처음으로</button>
+</div>
+
+<!-- JS 모듈 진입점 -->
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

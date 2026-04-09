@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProctorAI — 관리자</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<!-- ══════════════ 사이드바 ══════════════ -->
+<div class="sidebar">
+  <div class="sb-brand">
+    <div class="sb-brand-name">PROCTOR<span style="color:var(--accent2)">AI</span></div>
+    <div class="sb-brand-role">관리자 대시보드</div>
+  </div>
+  <nav class="sb-nav">
+    <button class="sb-btn on" onclick="nav('dashboard',this)"><span class="ico">📊</span>대시보드</button>
+    <button class="sb-btn"    onclick="nav('create',this)"   ><span class="ico">📝</span>시험 생성</button>
+    <button class="sb-btn"    onclick="nav('exams',this)"    ><span class="ico">📋</span>시험 목록</button>
+    <button class="sb-btn"    onclick="nav('monitor',this)"  ><span class="ico">👁</span>실시간 감독<span class="sb-badge" id="alert-badge">!</span></button>
+    <button class="sb-btn"    onclick="nav('logs',this)"     ><span class="ico">📄</span>전체 로그</button>
+    <button class="sb-btn"    onclick="nav('settings',this)" ><span class="ico">⚙️</span>설정</button>
+  </nav>
+  <div class="sb-footer">
+    <div class="admin-chip">
+      <div class="admin-chip-name" id="admin-name-disp">관리자</div>
+      <div class="admin-chip-sub">시험 감독관</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ 메인 ══════════════ -->
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-crumb" id="crumb">대시보드</div>
+    <div class="topbar-r">
+      <div class="live-chip" id="live-chip"><div class="dot blink"></div>LIVE 감독 중</div>
+      <button class="btn btn-ghost btn-sm" onclick="window.open('exam/index.html','_blank')">응시자 페이지 →</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ── 대시보드 ── -->
+    <div class="page on" id="page-dashboard">
+      <div class="ph"><div class="ph-title">대시보드</div><div class="ph-sub">ProctorAI 시스템 현황</div></div>
+      <div class="stat-row">
+        <div class="stat"><div class="stat-n a" id="d-exams">0</div><div class="stat-l">등록 시험</div></div>
+        <div class="stat"><div class="stat-n g" id="d-active">0</div><div class="stat-l">진행 중</div></div>
+        <div class="stat"><div class="stat-n w" id="d-warns">0</div><div class="stat-l">오늘 경고</div></div>
+        <div class="stat"><div class="stat-n d" id="d-term">0</div><div class="stat-l">강제 종료</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+        <div class="card"><div class="card-t">최근 이벤트</div><div id="d-loglist"><div style="font-size:12px;color:var(--muted)">이벤트 없음</div></div></div>
+        <div class="card"><div class="card-t">등록 시험</div><div id="d-examlist"><div style="font-size:12px;color:var(--muted)">시험을 먼저 생성하세요</div></div></div>
+      </div>
+    </div>
+
+    <!-- ── 시험 생성 ── -->
+    <div class="page" id="page-create">
+      <div class="ph"><div class="ph-title">시험 생성</div><div class="ph-sub">PDF 업로드 → AI가 자동으로 문제 생성</div></div>
+
+      <div class="card">
+        <div class="card-t">① 시험 기본 정보</div>
+        <div class="row2">
+          <div><label class="lbl">시험 이름</label><input type="text" class="inp" id="n-name" placeholder="예: 인공지능 개론 중간고사"></div>
+          <div><label class="lbl">제한 시간</label>
+            <select class="inp" id="n-dur">
+              <option value="600">10분</option><option value="1800" selected>30분</option>
+              <option value="3600">60분</option><option value="5400">90분</option>
+            </select>
+          </div>
+        </div>
+        <div class="row2">
+          <div><label class="lbl">생성 문항 수</label>
+            <select class="inp" id="n-qcnt">
+              <option value="5">5문항</option><option value="10" selected>10문항</option>
+              <option value="15">15문항</option><option value="20">20문항</option>
+            </select>
+          </div>
+          <div><label class="lbl">난이도</label>
+            <select class="inp" id="n-diff">
+              <option value="쉬움">쉬움</option><option value="보통" selected>보통</option><option value="어려움">어려움</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-t">② PDF 업로드</div>
+        <div class="upload" id="upload-zone"
+          onclick="document.getElementById('pdf-inp').click()"
+          ondragover="event.preventDefault();this.classList.add('drag')"
+          ondragleave="this.classList.remove('drag')"
+          ondrop="handleDrop(event)">
+          <div class="upload-ico">📄</div>
+          <div class="upload-t">PDF를 드래그하거나 클릭하여 업로드</div>
+          <div class="upload-s">시험지 또는 강의자료 PDF · 최대 20MB</div>
+        </div>
+        <input type="file" id="pdf-inp" accept=".pdf" style="display:none" onchange="handleFile(event)">
+        <div id="pdf-chip" style="display:none" class="pdf-chip">
+          <span style="font-size:22px">📄</span>
+          <div class="pdf-chip-info">
+            <div class="pdf-chip-name" id="pdf-name"></div>
+            <div class="pdf-chip-size" id="pdf-size"></div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="clearPdf()">✕</button>
+        </div>
+        <div id="pdf-preview" style="display:none;margin-top:12px;">
+          <div class="lbl" style="margin-bottom:5px">추출 텍스트 미리보기</div>
+          <div id="pdf-prev-text" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:11px;max-height:110px;overflow-y:auto;font-size:11px;line-height:1.6;color:var(--muted)"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-t">③ AI 문제 생성 (Groq · llama3 · 무료)</div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <button class="btn btn-p" id="gen-btn" onclick="generateQs()" disabled>🤖 AI 문제 생성</button>
+          <span style="font-size:12px;color:var(--muted)" id="gen-status">PDF를 먼저 업로드하세요</span>
+        </div>
+        <div class="prog-wrap" id="gen-prog" style="display:none">
+          <div class="prog-labels"><span id="gen-step">준비 중...</span><span id="gen-pct">0%</span></div>
+          <div class="prog-bg"><div class="prog-fill" id="gen-bar" style="width:0"></div></div>
+        </div>
+        <div class="q-list" id="q-preview"></div>
+        <div id="save-sec" style="display:none;margin-top:18px;padding-top:16px;border-top:1px solid var(--border);">
+          <div style="display:flex;gap:10px;">
+            <button class="btn btn-g" onclick="saveExam()">✅ 시험 등록</button>
+            <button class="btn btn-ghost" onclick="generateQs()">🔄 재생성</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 시험 목록 ── -->
+    <div class="page" id="page-exams">
+      <div class="ph"><div class="ph-title">시험 목록</div><div class="ph-sub">등록된 시험 관리</div></div>
+      <div class="card">
+        <table class="tbl">
+          <thead><tr><th>시험명</th><th>문항</th><th>시간</th><th>응시자</th><th>상태</th><th>작업</th></tr></thead>
+          <tbody id="exam-tbody"><tr><td colspan="6" style="text-align:center;color:var(--muted);padding:28px">등록된 시험 없음</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── 실시간 감독 ── -->
+    <div class="page" id="page-monitor">
+      <div class="ph"><div class="ph-title">실시간 감독</div><div class="ph-sub">현재 응시 중인 학생 현황</div></div>
+      <div class="card" style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;margin-bottom:16px;">
+        <div><div style="font-size:13px;font-weight:600">진행 중인 시험</div><div style="font-size:12px;color:var(--muted)" id="mon-exam">활성 시험 없음</div></div>
+        <div class="live-chip" id="mon-live"><div class="dot blink"></div>LIVE</div>
+      </div>
+      <div class="stu-grid" id="stu-grid"><div style="font-size:12px;color:var(--muted)">응시 중인 학생 없음</div></div>
+    </div>
+
+    <!-- ── 전체 로그 ── -->
+    <div class="page" id="page-logs">
+      <div class="ph"><div class="ph-title">전체 로그</div><div class="ph-sub">모든 응시자의 감독 이벤트</div></div>
+      <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+        <select class="inp" style="width:auto;min-width:150px;margin:0" id="lf-exam" onchange="renderLogs()"><option value="">전체 시험</option></select>
+        <select class="inp" style="width:auto;min-width:120px;margin:0" id="lf-sev"  onchange="renderLogs()">
+          <option value="">전체 등급</option><option value="danger">위험</option>
+          <option value="warn">경고</option><option value="info">정보</option><option value="ok">정상</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="exportCsv()">📥 CSV 내보내기</button>
+      </div>
+      <div class="log-wrap">
+        <div class="log-head">
+          <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)">이벤트 로그</div>
+          <div style="font-size:11px;color:var(--muted)" id="log-cnt">0건</div>
+        </div>
+        <div class="log-body">
+          <div class="log-row" style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.5px;border-bottom:1px solid var(--border);">
+            <div>시각</div><div>응시자</div><div>이벤트</div><div>등급</div>
+          </div>
+          <div id="log-tbody"><div style="padding:22px;text-align:center;font-size:12px;color:var(--muted)">로그 없음</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 설정 ── -->
+    <div class="page" id="page-settings">
+      <div class="ph"><div class="ph-title">설정</div><div class="ph-sub">API · Firebase · 감독 기준</div></div>
+
+      <div class="card">
+        <div class="card-t">관리자 정보</div>
+        <label class="lbl">관리자 이름</label>
+        <input type="text" class="inp" id="set-admin" placeholder="홍길동 교수">
+        <button class="btn btn-ghost btn-sm" onclick="saveAdmin()">저장</button>
+      </div>
+
+      <div class="card">
+        <div class="card-t">🔑 Groq API Key (무료 · 문제 생성용)</div>
+        <label class="lbl">API Key</label>
+        <input type="password" class="inp" id="set-groq" placeholder="gsk_...">
+        <div style="font-size:11px;color:var(--muted);margin-top:-8px;margin-bottom:13px;">
+          무료 발급: <a href="https://console.groq.com/keys" target="_blank" style="color:var(--accent)">console.groq.com/keys</a> (카드 불필요)
+        </div>
+        <button class="btn btn-p btn-sm" onclick="saveGroq()">저장</button>
+      </div>
+
+      <div class="card">
+        <div class="card-t">🔥 Firebase 연동 (실시간 양방향 동기화)</div>
+        <div class="fb-note">
+          <div class="fb-note-t">⚡ Firebase 무료 설정 방법</div>
+          <div class="fb-note-b">
+            1. <a href="https://console.firebase.google.com" target="_blank" style="color:var(--accent)">Firebase Console</a> → 새 프로젝트 생성<br>
+            2. Firestore Database → 시작 → 테스트 모드 선택<br>
+            3. 프로젝트 설정(⚙️) → 웹 앱 추가(&lt;/&gt;) → 구성 정보 복사<br>
+            4. 아래 필드에 붙여넣기 후 저장 · 연결
+          </div>
+        </div>
+        <div class="row2">
+          <div><label class="lbl">API Key</label><input type="text" class="inp" id="fb-k" placeholder="AIzaSy..."></div>
+          <div><label class="lbl">Auth Domain</label><input type="text" class="inp" id="fb-d" placeholder="project.firebaseapp.com"></div>
+        </div>
+        <div class="row2">
+          <div><label class="lbl">Project ID</label><input type="text" class="inp" id="fb-p" placeholder="my-proctai"></div>
+          <div><label class="lbl">Storage Bucket</label><input type="text" class="inp" id="fb-b" placeholder="project.appspot.com"></div>
+        </div>
+        <div class="row2">
+          <div><label class="lbl">Messaging Sender ID</label><input type="text" class="inp" id="fb-s" placeholder="123456789"></div>
+          <div><label class="lbl">App ID</label><input type="text" class="inp" id="fb-a" placeholder="1:123:web:abc"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <button class="btn btn-p btn-sm" onclick="saveFb()">Firebase 저장 &amp; 연결</button>
+          <span style="font-size:11px;" id="fb-status"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-t">⚙️ 감독 기준</div>
+        <div class="row2">
+          <div><label class="lbl">시선 이탈 허용(초)</label><input type="number" class="inp" id="set-gaze" value="3" min="1" max="10"></div>
+          <div><label class="lbl">최대 경고 횟수</label><input type="number" class="inp" id="set-maxw" value="3" min="1" max="10"></div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="saveProctor()">저장</button>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<!-- JS 모듈 진입점 -->
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
