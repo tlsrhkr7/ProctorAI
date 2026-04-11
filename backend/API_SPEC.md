@@ -11,8 +11,11 @@
 ## Base URL
 
 ```
-http://localhost:8000/api
+https://proctorai-production.up.railway.app/api
 ```
+
+> 로컬 개발 시: `http://localhost:8000/api`
+> Swagger UI: https://proctorai-production.up.railway.app/docs
 
 ---
 
@@ -635,6 +638,120 @@ PUT /api/admin/settings
   "max_warnings": 3
 }
 ```
+
+---
+
+## 9. 소명 (Clarifications)
+
+### 9-1. 소명 제출 (STUDENT)
+```
+POST /api/clarifications
+```
+**Request**
+```json
+{
+  "attempt_id": 1,
+  "reason_type": "gaze_away",
+  "reason_detail": "시선 이탈 감지",
+  "student_message": "필기 확인 중이었습니다"
+}
+```
+**Response** `201`
+```json
+{
+  "id": 1,
+  "attempt_id": 1,
+  "exam_id": 1,
+  "student_id": 2,
+  "reason_type": "gaze_away",
+  "reason_detail": "시선 이탈 감지",
+  "student_message": "필기 확인 중이었습니다",
+  "status": "pending",
+  "teacher_comment": null,
+  "created_at": "2026-04-11T10:30:00",
+  "reviewed_at": null
+}
+```
+> attempt 상태가 `under_review`일 때만 제출 가능
+
+---
+
+### 9-2. 본인 소명 조회 (STUDENT)
+```
+GET /api/clarifications/me/{attempt_id}
+```
+**Response** `200` — 9-1 응답과 동일 구조
+
+---
+
+### 9-3. 대기 소명 목록 (ADMIN)
+```
+GET /api/admin/clarifications/pending
+```
+**Response** `200`
+```json
+[
+  {
+    "id": 1,
+    "attempt_id": 1,
+    "reason_type": "gaze_away",
+    "reason_detail": "시선 이탈 감지",
+    "status": "pending",
+    "created_at": "2026-04-11T10:30:00",
+    "student_name": "홍길동",
+    "exam_title": "중간고사"
+  }
+]
+```
+
+---
+
+### 9-4. 소명 상세 (ADMIN)
+```
+GET /api/admin/clarifications/{clarification_id}
+```
+**Response** `200` — 전체 필드 + `student_name`, `exam_title` 포함
+
+---
+
+### 9-5. 소명 판정 (ADMIN)
+```
+PATCH /api/admin/clarifications/{clarification_id}/decision
+```
+**Request**
+```json
+{
+  "status": "approved",
+  "teacher_comment": "허용된 필기입니다"
+}
+```
+**Response** `200`
+> `approved` → attempt가 `in_progress`로 복귀
+> `rejected` → attempt가 `terminated`로 변경
+
+---
+
+## 10. 관리자 상태 변경 (ADMIN)
+
+### 10-1. attempt 상태 수동 변경
+```
+PATCH /api/admin/attempts/{attempt_id}/status
+```
+**Request**
+```json
+{
+  "status": "under_review"
+}
+```
+**Response** `200`
+```json
+{
+  "attempt_id": 1,
+  "old_status": "terminated",
+  "new_status": "under_review"
+}
+```
+> 가능한 상태: `in_progress`, `under_review`, `submitted`, `terminated`
 
 ---
 
