@@ -1,10 +1,11 @@
+import os
 from datetime import datetime, timedelta
 from fastapi import Request, HTTPException, Depends
 from jose import jwt, JWTError
 from passlib.context import CryptContext
 from db import get_conn
 
-SECRET_KEY = "proctorai-secret-key-change-in-production"
+SECRET_KEY = os.getenv("SECRET_KEY", "proctorai-secret-key-change-in-production")
 ALGORITHM = "HS256"
 TOKEN_EXPIRE_HOURS = 24
 

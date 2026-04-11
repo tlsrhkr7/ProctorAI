@@ -1,3 +1,4 @@
+import os
 import aiomysql
 from contextlib import asynccontextmanager
 
@@ -6,11 +7,11 @@ _pool = None
 async def init_pool():
     global _pool
     _pool = await aiomysql.create_pool(
-        host="127.0.0.1",
-        port=3306,
-        user="root",
-        password="root",
-        db="proctorai",
+        host=os.getenv("DB_HOST", "127.0.0.1"),
+        port=int(os.getenv("DB_PORT", "3306")),
+        user=os.getenv("DB_USER", "root"),
+        password=os.getenv("DB_PASSWORD", "root"),
+        db=os.getenv("DB_NAME", "proctorai"),
         charset="utf8mb4",
         autocommit=True,
         minsize=2,
