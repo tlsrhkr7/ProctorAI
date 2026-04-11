@@ -6,12 +6,18 @@ _pool = None
 
 async def init_pool():
     global _pool
+    db_host = os.getenv("DB_HOST", "127.0.0.1")
+    db_port = int(os.getenv("DB_PORT", "3306"))
+    db_user = os.getenv("DB_USER", "root")
+    db_pass = os.getenv("DB_PASSWORD", "root")
+    db_name = os.getenv("DB_NAME", "proctorai")
+    print(f"[DB] Connecting to {db_user}@{db_host}:{db_port}/{db_name}")
     _pool = await aiomysql.create_pool(
-        host=os.getenv("DB_HOST", "127.0.0.1"),
-        port=int(os.getenv("DB_PORT", "3306")),
-        user=os.getenv("DB_USER", "root"),
-        password=os.getenv("DB_PASSWORD", "root"),
-        db=os.getenv("DB_NAME", "proctorai"),
+        host=db_host,
+        port=db_port,
+        user=db_user,
+        password=db_pass,
+        db=db_name,
         charset="utf8mb4",
         autocommit=True,
         minsize=2,
