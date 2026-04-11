@@ -40,7 +40,7 @@ CREATE TABLE attempts (
     id              BIGINT AUTO_INCREMENT PRIMARY KEY,
     exam_id         BIGINT   NOT NULL,
     user_id         BIGINT   NOT NULL,
-    status          ENUM('in_progress','submitted','terminated') NOT NULL DEFAULT 'in_progress',
+    status          ENUM('in_progress','under_review','submitted','terminated') NOT NULL DEFAULT 'in_progress',
     score           INT               DEFAULT NULL,
     warning_count   INT      NOT NULL DEFAULT 0,
     total_away_time INT      NOT NULL DEFAULT 0 COMMENT '총 이탈 시간(초)',
@@ -84,4 +84,24 @@ CREATE TABLE settings (
     max_warnings    INT         NOT NULL DEFAULT 3,
     FOREIGN KEY (user_id) REFERENCES users(id),
     UNIQUE KEY uq_user (user_id)
+);
+
+-- 8. 부정행위 소명
+CREATE TABLE clarifications (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    attempt_id      BIGINT       NOT NULL,
+    exam_id         BIGINT       NOT NULL,
+    student_id      BIGINT       NOT NULL,
+    reason_type     VARCHAR(50)  NOT NULL COMMENT 'gaze_away/voice_detected/multiple_faces',
+    reason_detail   TEXT         NOT NULL COMMENT '감지 사유 문구',
+    student_message TEXT                  DEFAULT NULL COMMENT '학생 소명 내용',
+    status          ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+    teacher_comment TEXT                  DEFAULT NULL,
+    created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    reviewed_at     DATETIME              DEFAULT NULL,
+    FOREIGN KEY (attempt_id) REFERENCES attempts(id),
+    FOREIGN KEY (exam_id)    REFERENCES exams(id),
+    FOREIGN KEY (student_id) REFERENCES users(id),
+    INDEX idx_status (status),
+    INDEX idx_attempt (attempt_id)
 );
