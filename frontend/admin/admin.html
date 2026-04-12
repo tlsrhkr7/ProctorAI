@@ -195,7 +195,7 @@
 
     <!-- SETTINGS -->
     <div class="page" id="page-settings">
-      <div class="ph"><div class="ph-title">설정</div><div class="ph-sub">API · Firebase · 감독 기준</div></div>
+      <div class="ph"><div class="ph-title">설정</div><div class="ph-sub">API · 감독 기준</div></div>
       <div class="card">
         <div class="card-t">관리자 정보</div>
         <label class="lbl">관리자 이름</label>
@@ -210,34 +210,6 @@
           무료 발급: <a href="https://console.groq.com/keys" target="_blank" style="color:var(--accent)">console.groq.com/keys</a> (카드 불필요)
         </div>
         <button class="btn btn-p btn-sm" onclick="saveGroq()">저장</button>
-      </div>
-      <div class="card">
-        <div class="card-t">🔥 Firebase 연동 (실시간 양방향 동기화)</div>
-        <div class="fb-note">
-          <div class="fb-note-t">⚡ Firebase 무료 설정 방법</div>
-          <div class="fb-note-b">
-            1. <a href="https://console.firebase.google.com" target="_blank" style="color:var(--accent)">Firebase Console</a> → 새 프로젝트 생성<br>
-            2. Firestore Database → 시작 → 테스트 모드 선택<br>
-            3. 프로젝트 설정(⚙️) → 웹 앱 추가(&lt;/&gt;) → 구성 정보 복사<br>
-            4. 아래 필드에 붙여넣기 후 저장 · 연결
-          </div>
-        </div>
-        <div class="row2">
-          <div><label class="lbl">API Key</label><input type="text" class="inp" id="fb-k" placeholder="AIzaSy..."></div>
-          <div><label class="lbl">Auth Domain</label><input type="text" class="inp" id="fb-d" placeholder="project.firebaseapp.com"></div>
-        </div>
-        <div class="row2">
-          <div><label class="lbl">Project ID</label><input type="text" class="inp" id="fb-p" placeholder="my-proctai"></div>
-          <div><label class="lbl">Storage Bucket</label><input type="text" class="inp" id="fb-b" placeholder="project.appspot.com"></div>
-        </div>
-        <div class="row2">
-          <div><label class="lbl">Messaging Sender ID</label><input type="text" class="inp" id="fb-s" placeholder="123456789"></div>
-          <div><label class="lbl">App ID</label><input type="text" class="inp" id="fb-a" placeholder="1:123:web:abc"></div>
-        </div>
-        <div style="display:flex;align-items:center;gap:12px;">
-          <button class="btn btn-p btn-sm" onclick="saveFb()">Firebase 저장 &amp; 연결</button>
-          <span style="font-size:11px;" id="fb-status"></span>
-        </div>
       </div>
       <div class="card">
         <div class="card-t">⚙️ 감독 기준</div>

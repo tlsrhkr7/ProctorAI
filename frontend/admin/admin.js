@@ -340,7 +340,6 @@ window.saveGroq=async()=>{
   }catch(e){alert('저장 실패: '+e.message);}
 };
 
-window.saveFb=()=>alert('백엔드 API를 사용 중이므로 Firebase 설정이 필요 없습니다.');
 
 window.saveProctor=async()=>{
   try{
