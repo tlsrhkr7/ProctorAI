@@ -253,7 +253,9 @@ function initVoice(){
     if(!t.trim())return;
     document.getElementById('v-txt').textContent=`"${t}"`;
     // 확정된 발언만 분석 (interim 무시)
-    if(finalSpeech){
+    if(finalSpeech&&t.trim().length>1){
+      // 모든 발언 기록 (관리자 음성 기록 확인용)
+      sendLog('info','음성 기록',t.trim());
       const suspicious=await analyzeVoiceGroq(t);
       if(suspicious)triggerVoiceWarn(t);
     }

@@ -452,7 +452,8 @@ window.showResultDetail=async function(attemptId,userName){
     // 전체 로그 로드
     const allLogs=await api('GET',`/api/admin/attempts/${attemptId}/logs`);
     const chatLogs=allLogs.filter(l=>l.event&&l.event.startsWith('AI 면담'));
-    const eventLogs=allLogs.filter(l=>l.event&&!l.event.startsWith('AI 면담'));
+    const voiceLogs=allLogs.filter(l=>l.event==='음성 기록');
+    const eventLogs=allLogs.filter(l=>l.event&&!l.event.startsWith('AI 면담')&&l.event!=='음성 기록');
     const chatEl=document.getElementById('rm-answers');
 
     // 이벤트 타임라인
@@ -482,6 +483,28 @@ window.showResultDetail=async function(attemptId,userName){
         </div>`);
     }
 
+    // 음성 기록 (전체 발언 대본)
+    if(voiceLogs.length){
+      chatEl.insertAdjacentHTML('beforeend',`
+        <div style="margin-top:20px">
+          <div class="card-t" style="margin-bottom:10px">🎙 음성 기록 <span style="font-size:10px;font-weight:400;color:var(--muted)">(총 ${voiceLogs.length}건)</span></div>
+          <div style="display:flex;flex-direction:column;gap:4px;max-height:280px;overflow-y:auto;padding-right:4px">
+            ${[...voiceLogs].reverse().map(l=>{
+              const ts=l.timestamp?new Date(l.timestamp).toLocaleTimeString('ko'):'-';
+              // 의심 발언 여부 체크 (동일 시간대 음성 경고 로그와 매칭)
+              const isSusp=allLogs.some(x=>x.event==='음성 경고'&&Math.abs(new Date(x.timestamp)-new Date(l.timestamp))<3000);
+              return `<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 10px;background:${isSusp?'rgba(239,68,68,.08)':'var(--bg3)'};border-radius:6px;border-left:3px solid ${isSusp?'var(--danger)':'var(--border)'}">
+                <span style="font-size:10px;color:var(--muted);white-space:nowrap;margin-top:2px">${ts}</span>
+                <span style="font-size:12px;flex:1">${l.detail||''}</span>
+                ${isSusp?'<span style="font-size:10px;color:var(--danger);font-weight:700;white-space:nowrap">⚠ 의심</span>':''}
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`);
+    }else{
+      chatEl.insertAdjacentHTML('beforeend','<div style="margin-top:16px;font-size:12px;color:var(--muted)">🎙 음성 기록 없음</div>');
+    }
+
     // AI 면담 로그
     if(chatLogs.length){
       chatEl.insertAdjacentHTML('beforeend',`
@@ -507,7 +530,7 @@ window.showResultDetail=async function(attemptId,userName){
         </div>`);
     }
 
-    if(!eventLogs.length&&!chatLogs.length){
+    if(!eventLogs.length&&!voiceLogs.length&&!chatLogs.length){
       chatEl.insertAdjacentHTML('beforeend','<div style="margin-top:20px;font-size:12px;color:var(--muted)">감독 로그 없음</div>');
     }
   }catch(e){document.getElementById('rm-stats').innerHTML=`<div style="color:var(--danger);font-size:12px">로드 실패: ${e.message}</div>`;}
