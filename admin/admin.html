@@ -19,7 +19,6 @@
     <button class="sb-btn" onclick="nav('create',this)"><span class="ico">📝</span>시험 생성</button>
     <button class="sb-btn" onclick="nav('exams',this)"><span class="ico">📋</span>시험 목록</button>
     <button class="sb-btn" onclick="nav('monitor',this)"><span class="ico">👁</span>실시간 감독<span class="sb-badge" id="alert-badge">!</span></button>
-    <button class="sb-btn" onclick="nav('logs',this)"><span class="ico">📄</span>전체 로그</button>
     <button class="sb-btn" onclick="nav('results',this)"><span class="ico">🏆</span>응시 결과</button>
     <button class="sb-btn" onclick="nav('settings',this)"><span class="ico">⚙️</span>설정</button>
   </nav>
@@ -52,8 +51,8 @@
         <div class="stat"><div class="stat-n d" id="d-term">0</div><div class="stat-l">강제 종료</div></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
-        <div class="card"><div class="card-t">최근 이벤트</div><div id="d-loglist"><div style="font-size:12px;color:var(--muted)">이벤트 없음</div></div></div>
-        <div class="card"><div class="card-t">등록 시험</div><div id="d-examlist"><div style="font-size:12px;color:var(--muted)">시험을 먼저 생성하세요</div></div></div>
+        <div class="card"><div class="card-t">📝 시험 현황</div><div id="d-examlist"></div></div>
+        <div class="card"><div class="card-t">⚠️ 최근 경고 응시자</div><div id="d-warnlist"></div></div>
       </div>
     </div>
 
@@ -129,29 +128,23 @@
         <div><div style="font-size:13px;font-weight:600">진행 중인 시험</div><div style="font-size:12px;color:var(--muted)" id="mon-exam">활성 시험 없음</div></div>
         <div class="live-chip" id="mon-live"><div class="dot blink"></div>LIVE</div>
       </div>
-      <div class="stu-grid" id="stu-grid"><div style="font-size:12px;color:var(--muted)">응시 중인 학생 없음</div></div>
-    </div>
-
-    <!-- LOGS -->
-    <div class="page" id="page-logs">
-      <div class="ph"><div class="ph-title">전체 로그</div><div class="ph-sub">모든 응시자의 감독 이벤트</div></div>
-      <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
-        <select class="inp" style="width:auto;min-width:150px;margin:0" id="lf-exam" onchange="renderLogs()"><option value="">전체 시험</option></select>
-        <select class="inp" style="width:auto;min-width:120px;margin:0" id="lf-sev" onchange="renderLogs()">
-          <option value="">전체 등급</option><option value="danger">위험</option><option value="warn">경고</option><option value="info">정보</option><option value="ok">정상</option>
-        </select>
-        <button class="btn btn-ghost btn-sm" onclick="exportCsv()">📥 CSV 내보내기</button>
-      </div>
-      <div class="log-wrap">
-        <div class="log-head">
-          <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)">이벤트 로그</div>
-          <div style="font-size:11px;color:var(--muted)" id="log-cnt">0건</div>
-        </div>
-        <div class="log-body">
-          <div class="log-row" style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.5px;border-bottom:1px solid var(--border);">
-            <div>시각</div><div>응시자</div><div>이벤트</div><div>등급</div>
+      <div class="stu-grid" id="stu-grid"></div>
+      <!-- 관리자 개입 모달 -->
+      <div id="intervene-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;align-items:center;justify-content:center;">
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:28px;width:420px;max-width:90vw">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <div style="font-size:15px;font-weight:700" id="iv-title">관리자 개입</div>
+            <button class="btn btn-ghost btn-sm" onclick="closeIntervene()">✕</button>
           </div>
-          <div id="log-tbody"><div style="padding:22px;text-align:center;font-size:12px;color:var(--muted)">로그 없음</div></div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:18px" id="iv-sub"></div>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
+            <button class="btn btn-ghost" onclick="interveneAction('pause')">⏸ 시험 일시정지</button>
+            <button class="btn btn-ghost" onclick="interveneAction('terminate')" style="color:var(--danger);border-color:var(--danger)">🚫 시험 강제 종료</button>
+          </div>
+          <div style="margin-bottom:8px"><label class="lbl">관리자 메시지 전송</label>
+            <textarea class="inp" id="iv-msg" placeholder="응시자에게 보낼 메시지..." style="height:72px;resize:none;font-family:var(--sans)"></textarea>
+          </div>
+          <button class="btn btn-p" onclick="interveneAction('message')" style="width:100%">📨 메시지 전송</button>
         </div>
       </div>
     </div>
@@ -188,8 +181,16 @@
           <button class="btn btn-ghost btn-sm" onclick="closeResultModal()">✕ 닫기</button>
         </div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px" id="rm-stats"></div>
-        <div class="card-t" style="margin-bottom:10px">문항별 답안</div>
-        <div id="rm-answers"></div>
+        <div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:0">
+          <button class="tab-btn on" id="tab-answers" onclick="switchTab('answers')">📝 답안</button>
+          <button class="tab-btn" id="tab-events" onclick="switchTab('events')">📋 이벤트</button>
+          <button class="tab-btn" id="tab-voice" onclick="switchTab('voice')">🎙 음성기록</button>
+          <button class="tab-btn" id="tab-chat" onclick="switchTab('chat')">🤖 AI면담</button>
+        </div>
+        <div id="rm-tab-answers"><div id="rm-answers"></div></div>
+        <div id="rm-tab-events" style="display:none"><div id="rm-events"></div></div>
+        <div id="rm-tab-voice" style="display:none"><div id="rm-voice"></div></div>
+        <div id="rm-tab-chat" style="display:none"><div id="rm-chat"></div></div>
       </div>
     </div>
 

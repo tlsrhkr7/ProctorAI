@@ -124,3 +124,6 @@ select.inp{appearance:none;cursor:pointer;}
 @keyframes bp{0%,100%{opacity:1}50%{opacity:.55}}
 @keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .fi{animation:fi .3s ease-out;}
+.tab-btn{padding:8px 16px;border:none;border-bottom:2px solid transparent;background:none;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans);transition:all .15s;margin-bottom:-1px;}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.on{color:var(--accent);border-bottom-color:var(--accent);}
