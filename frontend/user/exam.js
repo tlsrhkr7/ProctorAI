@@ -252,12 +252,9 @@ function initVoice(){
     for(let i=e.resultIndex;i<e.results.length;i++){t+=e.results[i][0].transcript;if(e.results[i].isFinal)finalSpeech=true;}
     if(!t.trim())return;
     document.getElementById('v-txt').textContent=`"${t}"`;
-    // 확정된 발언만 분석 (interim 무시)
+    // 확정된 발언만 기록 (interim 무시)
     if(finalSpeech&&t.trim().length>1){
-      // 모든 발언 기록 (관리자 음성 기록 확인용)
       sendLog('info','음성 기록',t.trim());
-      const suspicious=await analyzeVoiceGroq(t);
-      if(suspicious)triggerVoiceWarn(t);
     }
   };
   rec.onerror=e=>{if(e.error!=='no-speech')addLog('warn','음성 오류',e.error);};
