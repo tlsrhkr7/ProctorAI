@@ -20,6 +20,7 @@
     <button class="sb-btn" onclick="nav('exams',this)"><span class="ico">📋</span>시험 목록</button>
     <button class="sb-btn" onclick="nav('monitor',this)"><span class="ico">👁</span>실시간 감독<span class="sb-badge" id="alert-badge">!</span></button>
     <button class="sb-btn" onclick="nav('logs',this)"><span class="ico">📄</span>전체 로그</button>
+    <button class="sb-btn" onclick="nav('results',this)"><span class="ico">🏆</span>응시 결과</button>
     <button class="sb-btn" onclick="nav('settings',this)"><span class="ico">⚙️</span>설정</button>
   </nav>
   <div class="sb-footer">
@@ -35,7 +36,7 @@
     <div class="topbar-crumb" id="crumb">대시보드</div>
     <div class="topbar-r">
       <div class="live-chip" id="live-chip"><div class="dot blink"></div>LIVE 감독 중</div>
-      <button class="btn btn-ghost btn-sm" onclick="window.open('exam.html','_blank')">응시자 페이지 →</button>
+      <button class="btn btn-ghost btn-sm" onclick="window.open('../user/exam.html','_blank')">응시자 페이지 →</button>
     </div>
   </div>
 
@@ -152,6 +153,43 @@
           </div>
           <div id="log-tbody"><div style="padding:22px;text-align:center;font-size:12px;color:var(--muted)">로그 없음</div></div>
         </div>
+      </div>
+    </div>
+
+    <!-- RESULTS -->
+    <div class="page" id="page-results">
+      <div class="ph"><div class="ph-title">응시 결과</div><div class="ph-sub">시험별 응시자 점수 및 감독 결과</div></div>
+      <div class="card">
+        <div class="card-t">시험 선택</div>
+        <select class="inp" id="res-exam-sel" onchange="loadResults()" style="max-width:400px">
+          <option value="">-- 시험을 선택하세요 --</option>
+        </select>
+      </div>
+      <div class="card" id="res-table-card" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div class="card-t" style="margin:0" id="res-table-title">응시자 목록</div>
+          <span style="font-size:12px;color:var(--muted)" id="res-count"></span>
+        </div>
+        <table class="tbl">
+          <thead><tr><th>학번</th><th>상태</th><th>점수</th><th>경고</th><th>이탈(초)</th><th>음성경고</th><th>시작시간</th><th>상세</th></tr></thead>
+          <tbody id="res-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- RESULT DETAIL MODAL -->
+    <div id="res-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;">
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;width:100%;max-width:720px;padding:28px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+          <div>
+            <div style="font-size:16px;font-weight:700" id="rm-title">결과 상세</div>
+            <div style="font-size:12px;color:var(--muted)" id="rm-sub"></div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="closeResultModal()">✕ 닫기</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px" id="rm-stats"></div>
+        <div class="card-t" style="margin-bottom:10px">문항별 답안</div>
+        <div id="rm-answers"></div>
       </div>
     </div>
 
