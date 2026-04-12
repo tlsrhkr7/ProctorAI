@@ -339,9 +339,7 @@ window.interveneAction = async function(type) {
     } else if(type === 'message') {
       const msg = document.getElementById('iv-msg').value.trim();
       if(!msg) { alert('메시지를 입력하세요'); return; }
-      await api('POST', `/api/student/attempts/${_interveneAttemptId}/logs`, {
-        severity: 'info', event: '관리자 메시지', detail: msg
-      });
+      await api('POST', `/api/admin/attempts/${_interveneAttemptId}/message`, {message: msg});
       alert('메시지가 전송되었습니다.');
       document.getElementById('iv-msg').value = '';
     }

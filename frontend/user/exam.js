@@ -281,22 +281,15 @@ function initWindowGuard(){
       sendLog('info','화면 복귀',`${sec}초 자리 비움 후 복귀`);
     }
   });
-  // 창 최소화 / 다른 프로그램 전환 감지 (blur + 3초 유예)
-  let blurTimer=null;
+  // 창 최소화 / 다른 프로그램 전환 감지 (즉시)
   window.addEventListener('blur',()=>{
     if(S.terminated||!S.attemptId||document.hidden)return;
-    blurTimer=setTimeout(()=>{
-      if(S.terminated||document.hidden)return; // visibilitychange가 이미 처리
-      addLog('warn','창 포커스 이탈','다른 프로그램/창으로 전환 (3초+)');
-      sendLog('warn','창 포커스 이탈','다른 프로그램/창으로 전환됨');
-      S.warns++;updateWB();
-      if(S.warns>=S.maxWarns){terminate('경고 누적 — 0점 퇴장');}
-      else if(S.warns%2===0){startChat('window');}
-      else{showWarn('창 전환 감지',`다른 프로그램 또는 최소화가 감지되었습니다.\n경고 ${S.warns}회`);flash('w');}
-    },3000);
-  });
-  window.addEventListener('focus',()=>{
-    if(blurTimer){clearTimeout(blurTimer);blurTimer=null;}
+    addLog('warn','창 포커스 이탈','다른 프로그램/창으로 전환');
+    sendLog('warn','창 포커스 이탈','다른 프로그램/창으로 전환됨');
+    S.warns++;updateWB();
+    if(S.warns>=S.maxWarns){terminate('경고 누적 — 0점 퇴장');}
+    else if(S.warns%2===0){startChat('window');}
+    else{showWarn('창 전환 감지',`다른 프로그램 또는 최소화가 감지되었습니다.\n경고 ${S.warns}회`);flash('w');}
   });
   // 창 닫기 = 0점 처리
   window.addEventListener('beforeunload',()=>{
