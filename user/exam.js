@@ -208,7 +208,7 @@ function updateGaze(away,val){
   if(stableAway&&!S.gazeAway){S.gazeAway=true;S.gazeAwayTime=0;S.gazeTimer=setInterval(()=>{if(!S.gazeAway||S.paused||S.terminated){clearInterval(S.gazeTimer);return;}S.gazeAwayTime++;S.totalAway++;document.getElementById('st-away').textContent=S.totalAway+'s';if(S.gazeAwayTime>=S.gazeThreshold){gazeWarn();clearInterval(S.gazeTimer);}},1000);}
   else if(!stableAway&&S.gazeAway){S.gazeAway=false;S.gazeAwayTime=0;clearInterval(S.gazeTimer);}
 }
-function gazeWarn(){S.warns++;updateWB();addLog('warn','시선 이탈',`${S.gazeThreshold}초+ (경고 ${S.warns}/${S.maxWarns})`);sendLog('warn','시선 이탈',`${S.gazeThreshold}초+ 이탈 — 경고 ${S.warns}회`);const we=document.getElementById('st-warns');we.textContent=S.warns+'회';we.className='sbox-v '+(S.warns>=S.maxWarns?'d':'w');if(S.warns>=S.maxWarns){terminate('시선 이탈 3회 누적 — 0점 퇴장');}else{showWarn('시선 이탈 감지',`화면을 ${S.gazeThreshold}초+ 이탈했습니다.\n경고 ${S.warns}/${S.maxWarns}회\n${S.maxWarns-S.warns}회 추가 경고 시 시험이 즉시 종료됩니다.`);flash('w');}}
+function gazeWarn(){S.warns++;updateWB();addLog('warn','시선 이탈',`${S.gazeThreshold}초+ (경고 ${S.warns}/${S.maxWarns})`);sendLog('warn','시선 이탈',`${S.gazeThreshold}초+ 이탈 — 경고 ${S.warns}회`);const we=document.getElementById('st-warns');we.textContent=S.warns+'회';we.className='sbox-v '+(S.warns>=S.maxWarns?'d':'w');if(S.warns>=S.maxWarns){terminate('시선 이탈 3회 누적 — 0점 퇴장');}else if(S.warns>=S.maxWarns-1){startChat('gaze');}else{showWarn('시선 이탈 감지',`화면을 ${S.gazeThreshold}초+ 이탈했습니다.\n경고 ${S.warns}/${S.maxWarns}회\n${S.maxWarns-S.warns}회 추가 경고 시 시험이 즉시 종료됩니다.`);flash('w');}}
 
 // ── Groq 음성 분석 ────────────────────────────────────────
 async function analyzeVoiceGroq(text){
@@ -237,6 +237,7 @@ function triggerVoiceWarn(text){
   sendLog('danger','음성 경고',`의심 발언: "${text.substring(0,40)}"`);
   S.warns++;updateWB();
   if(S.warns>=S.maxWarns){terminate('의심 발언 3회 누적 — 0점 퇴장');}
+  else if(S.warns>=S.maxWarns-1){startChat('voice');}
   else{showWarn('의심 발언 감지',`"${text.substring(0,30)}" 감지\n경고 ${S.warns}/${S.maxWarns}회\n${S.maxWarns-S.warns}회 추가 경고 시 시험이 즉시 종료됩니다.`);flash('d');}
 }
 
@@ -273,6 +274,7 @@ function initWindowGuard(){
       sendLog('warn','화면 이탈','다른 탭 또는 창으로 전환됨');
       S.warns++;updateWB();
       if(S.warns>=S.maxWarns){terminate('화면 이탈 3회 누적 — 0점 퇴장');}
+      else if(S.warns>=S.maxWarns-1){startChat('window');}
       else{showWarn('화면 이탈 감지',`다른 창 또는 탭으로 전환되었습니다.\n경고 ${S.warns}/${S.maxWarns}회\n${S.maxWarns-S.warns}회 추가 경고 시 시험이 즉시 종료됩니다.`);flash('w');}
     }else{
       const sec=hiddenAt?Math.round((Date.now()-hiddenAt)/1000):0;
@@ -290,6 +292,7 @@ function initWindowGuard(){
       sendLog('warn','창 포커스 이탈','다른 프로그램/창으로 전환됨');
       S.warns++;updateWB();
       if(S.warns>=S.maxWarns){terminate('창 이탈 3회 누적 — 0점 퇴장');}
+      else if(S.warns>=S.maxWarns-1){startChat('window');}
       else{showWarn('창 전환 감지',`다른 프로그램 또는 최소화가 감지되었습니다.\n경고 ${S.warns}/${S.maxWarns}회\n${S.maxWarns-S.warns}회 추가 경고 시 시험이 즉시 종료됩니다.`);flash('w');}
     },3000);
   });
@@ -318,7 +321,7 @@ function updateWB(){for(let i=1;i<=3;i++){const b=document.getElementById('wb'+i
 async function startChat(reason){
   if(S.paused||S.terminated)return;S.paused=true;document.getElementById('exam-content').classList.add('blurred');document.getElementById('ov-warn').classList.remove('act');if(S.recognition){try{S.recognition.stop();}catch(_){}}
   S.chatHistory=[];S.chatTurn=0;document.getElementById('chat-msgs').innerHTML='';document.getElementById('resume-btn').style.display='none';document.getElementById('ov-chat').classList.add('act');setStatus('d','AI 면담 중');
-  const rm={gaze:'시선이 반복 이탈',voice:'의심 발언이 반복 감지'};
+  const rm={gaze:'시선이 반복 이탈',voice:'의심 발언이 반복 감지',window:'화면/창 이탈이 반복 감지'};
   const msg=`안녕하세요, ${S.studentName}님. 저는 ProctorAI 감독 시스템입니다.\n\n${rm[reason]}되었습니다. 시험 공정성을 위해 간단한 확인이 필요합니다.\n\n현재 시험 외 다른 자료나 도움을 받고 있습니까?`;
   await typeMsg('ai',msg);S.chatHistory.push({role:'assistant',content:msg});S.chatTurn=1;addLog('danger','AI 면담 시작',rm[reason]);sendLog('danger','AI 면담 시작',rm[reason]);
 }

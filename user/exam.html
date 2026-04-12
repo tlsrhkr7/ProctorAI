@@ -14,14 +14,50 @@
 <div id="login-screen">
   <div class="brand"><div class="brand-icon">👁</div><div class="brand-name">ProctorAI</div></div>
   <div class="tagline">AI 기반 지능형 시험 감독 시스템</div>
-  <div class="login-card">
-    <label class="lbl">학번</label><input type="text" class="inp" id="l-id" placeholder="예: 2024001234">
-    <label class="lbl">이름</label><input type="text" class="inp" id="l-name" placeholder="예: 홍길동">
-    <div class="divider"></div>
-    <label class="lbl">응시할 시험 선택</label>
-    <select class="inp" id="l-exam"><option value="">-- 불러오는 중... --</option></select>
-    <button class="start-btn" onclick="startExam()">🚀 시험 시작</button>
-    <div class="notice">📷 본 시험은 <strong>카메라와 마이크</strong>를 사용하여 AI가 실시간 감독합니다. 부정행위 감지 시 경고 → 일시정지 → 강제 종료됩니다.</div>
+  <div class="login-wrap">
+    <div class="login-card">
+      <label class="lbl">학번</label><input type="text" class="inp" id="l-id" placeholder="예: 2024001234">
+      <label class="lbl">이름</label><input type="text" class="inp" id="l-name" placeholder="예: 홍길동">
+      <div class="divider"></div>
+      <label class="lbl">응시할 시험 선택</label>
+      <select class="inp" id="l-exam"><option value="">-- 불러오는 중... --</option></select>
+      <button class="start-btn" onclick="startExam()">🚀 시험 시작</button>
+      <div class="notice">📷 본 시험은 <strong>카메라와 마이크</strong>를 사용하여 AI가 실시간 감독합니다.</div>
+    </div>
+    <div class="rules-side">
+      <div class="rules-side-title">📋 응시 규정 안내</div>
+      <div class="rules-item warn-item">
+        <div class="ri-head">⚠️ 경고 사유 <span class="ri-badge">(누적 3회 시 강제 종료)</span></div>
+        <ul class="ri-list">
+          <li>👁 <strong>시선 이탈</strong> — 화면에서 시선이 3초 이상 벗어나는 경우</li>
+          <li>🚫 <strong>얼굴 미감지</strong> — 카메라에서 얼굴이 사라지는 경우</li>
+          <li>🖥 <strong>창 전환 / 최소화</strong> — 다른 프로그램이나 탭으로 전환하는 경우</li>
+          <li>🎙 <strong>의심 발언</strong> — 정답 요청 등 부정행위로 판단되는 발언</li>
+        </ul>
+      </div>
+      <div class="rules-item chat-item">
+        <div class="ri-head">🤖 경고 2회 누적 시</div>
+        <ul class="ri-list">
+          <li>시험이 <strong>일시정지</strong>되고 AI 감독관과 면담이 진행됩니다.</li>
+          <li>면담 완료 후 시험을 재개할 수 있습니다.</li>
+        </ul>
+      </div>
+      <div class="rules-item danger-item">
+        <div class="ri-head">🚫 즉시 0점 강제 종료</div>
+        <ul class="ri-list">
+          <li>경고 <strong>3회 누적</strong> 시 시험 즉시 종료 및 0점 처리</li>
+          <li>시험 창을 <strong>닫거나 브라우저를 종료</strong>하는 경우</li>
+        </ul>
+      </div>
+      <div class="rules-item info-item">
+        <div class="ri-head">📌 유의사항</div>
+        <ul class="ri-list">
+          <li>밝은 환경에서 카메라 <strong>정면</strong>을 바라보고 응시하세요.</li>
+          <li>시험 중 다른 프로그램 사용이 <strong>금지</strong>됩니다.</li>
+          <li>카메라·마이크는 시험 종료 시까지 <strong>항상 활성화</strong>되어야 합니다.</li>
+        </ul>
+      </div>
+    </div>
   </div>
 </div>
 
