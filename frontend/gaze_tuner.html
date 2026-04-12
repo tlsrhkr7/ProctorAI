@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Gaze Tuner — ProctorAI</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0f172a;color:#e2e8f0;font-family:monospace;display:flex;gap:20px;padding:20px;min-height:100vh}
+h2{font-size:14px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#94a3b8;margin-bottom:12px}
+.panel{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:16px}
+
+/* 왼쪽: 카메라 */
+.cam-wrap{position:relative;width:400px;flex-shrink:0}
+#cam-vid{width:400px;height:300px;object-fit:cover;border-radius:8px;display:block;background:#000}
+#cam-cvs{position:absolute;top:0;left:0;width:400px;height:300px;border-radius:8px}
+.status-bar{margin-top:10px;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:700;text-align:center;transition:all .2s}
+.status-ok{background:rgba(34,197,94,.15);border:1px solid #22c55e;color:#22c55e}
+.status-away{background:rgba(239,68,68,.15);border:1px solid #ef4444;color:#ef4444}
+.status-noface{background:rgba(251,191,36,.15);border:1px solid #fbbf24;color:#fbbf24}
+
+/* 오른쪽 */
+.right{flex:1;display:flex;flex-direction:column;gap:14px}
+
+/* 수치 패널 */
+.metrics{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.metric{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px;text-align:center}
+.metric-val{font-size:28px;font-weight:700;margin-bottom:4px}
+.metric-lbl{font-size:10px;color:#64748b;letter-spacing:.5px}
+.green{color:#22c55e}.red{color:#ef4444}.yellow{color:#fbbf24}.blue{color:#60a5fa}.gray{color:#94a3b8}
+
+/* 가로 게이지 */
+.gauge-wrap{margin:6px 0}
+.gauge-lbl{display:flex;justify-content:space-between;font-size:11px;color:#64748b;margin-bottom:4px}
+.gauge-track{height:12px;background:#0f172a;border-radius:6px;position:relative;overflow:hidden;border:1px solid #334155}
+.gauge-fill{height:100%;border-radius:6px;transition:width .1s,background .1s}
+.gauge-marker{position:absolute;top:0;height:100%;width:2px;background:#fff8;pointer-events:none}
+
+/* 슬라이더 */
+.slider-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.slider-row label{font-size:12px;color:#94a3b8;width:180px;flex-shrink:0}
+.slider-row input[type=range]{flex:1;accent-color:#6366f1}
+.slider-row .val{font-size:13px;font-weight:700;color:#e2e8f0;width:42px;text-align:right}
+
+/* 로그 */
+.log-box{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px;height:120px;overflow-y:auto;font-size:11px;line-height:1.8}
+.log-ok{color:#22c55e}.log-away{color:#ef4444}.log-noface{color:#fbbf24}
+
+/* 히스토리 차트 */
+#hist-cvs{width:100%;height:60px;border-radius:8px;display:block}
+
+.btn{background:#6366f1;border:none;color:#fff;padding:8px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;margin-top:4px}
+.btn:hover{background:#4f46e5}
+.copy-box{background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px 12px;font-size:12px;color:#a5f3fc;word-break:break-all}
+</style>
+</head>
+<body>
+
+<!-- 왼쪽: 카메라 -->
+<div style="display:flex;flex-direction:column;gap:14px;width:400px;flex-shrink:0">
+  <div class="panel cam-wrap" style="padding:12px">
+    <h2>카메라</h2>
+    <div style="position:relative;margin-top:8px">
+      <video id="cam-vid" autoplay playsinline muted></video>
+      <canvas id="cam-cvs"></canvas>
+    </div>
+    <div id="status-bar" class="status-bar status-ok" style="margin-top:8px">✅ 시선 정상</div>
+  </div>
+
+  <!-- 히스토리 -->
+  <div class="panel">
+    <h2>avg 히스토리 (최근 100프레임)</h2>
+    <canvas id="hist-cvs" height="60"></canvas>
+  </div>
+
+  <!-- 추출값 -->
+  <div class="panel">
+    <h2>적정값 코드</h2>
+    <div style="font-size:11px;color:#64748b;margin-bottom:8px">슬라이더 조정 후 이 값을 exam.js에 복사</div>
+    <div class="copy-box" id="code-out">—</div>
+    <button class="btn" onclick="copyCode()" style="margin-top:8px;width:100%">📋 클립보드 복사</button>
+  </div>
+</div>
+
+<!-- 오른쪽 -->
+<div class="right">
+
+  <!-- 실시간 수치 -->
+  <div class="panel">
+    <h2>실시간 측정값</h2>
+    <div class="metrics" style="grid-template-columns:1fr 1fr 1fr 1fr">
+      <div class="metric">
+        <div class="metric-val blue" id="m-avg">—</div>
+        <div class="metric-lbl">수평 avg</div>
+      </div>
+      <div class="metric">
+        <div class="metric-val yellow" id="m-vavg">—</div>
+        <div class="metric-lbl">수직 avg</div>
+      </div>
+      <div class="metric">
+        <div class="metric-val gray" id="m-frames">0</div>
+        <div class="metric-lbl">이탈 프레임</div>
+      </div>
+      <div class="metric">
+        <div class="metric-val gray" id="m-face">—</div>
+        <div class="metric-lbl">얼굴 감지</div>
+      </div>
+    </div>
+
+    <!-- 수평 게이지 -->
+    <div class="gauge-wrap" style="margin-top:14px">
+      <div class="gauge-lbl"><span>0 (왼쪽)</span><span>수평 iris 위치</span><span>1 (오른쪽)</span></div>
+      <div class="gauge-track" id="avg-track">
+        <div class="gauge-fill" id="avg-fill" style="width:50%"></div>
+        <div class="gauge-marker" id="thr-lo"></div>
+        <div class="gauge-marker" id="thr-hi"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:#475569;margin-top:3px">
+        <span id="lo-label">하한</span><span id="hi-label">상한</span>
+      </div>
+    </div>
+    <!-- 수직 게이지 -->
+    <div class="gauge-wrap" style="margin-top:10px">
+      <div class="gauge-lbl"><span>0 (위)</span><span>수직 iris 위치</span><span>1 (아래)</span></div>
+      <div class="gauge-track" id="vavg-track">
+        <div class="gauge-fill" id="vavg-fill" style="width:50%"></div>
+        <div class="gauge-marker" id="vthr-lo"></div>
+        <div class="gauge-marker" id="vthr-hi"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:#475569;margin-top:3px">
+        <span id="vlo-label">상단 경계</span><span id="vhi-label">하단 경계</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 슬라이더 -->
+  <div class="panel">
+    <h2>파라미터 조정</h2>
+
+    <div class="slider-row">
+      <label>수평 하한 (이 값 미만 → 이탈)</label>
+      <input type="range" id="sl-lo" min="0" max="0.5" step="0.01" value="0.25" oninput="update()">
+      <span class="val" id="vl-lo">0.25</span>
+    </div>
+    <div class="slider-row">
+      <label>수평 상한 (이 값 초과 → 이탈)</label>
+      <input type="range" id="sl-hi" min="0.5" max="1" step="0.01" value="0.75" oninput="update()">
+      <span class="val" id="vl-hi">0.75</span>
+    </div>
+    <div class="slider-row">
+      <label>수직: 이 값 미만 → 위 이탈</label>
+      <input type="range" id="sl-vlo" min="0" max="0.9" step="0.01" value="0.25" oninput="update()">
+      <span class="val" id="vl-vlo">0.25</span>
+    </div>
+    <div class="slider-row">
+      <label>수직: 이 값 초과 → 아래 이탈</label>
+      <input type="range" id="sl-vhi" min="0.1" max="1" step="0.01" value="0.55" oninput="update()">
+      <span class="val" id="vl-vhi">0.55</span>
+    </div>
+    <div class="slider-row">
+      <label>연속 이탈 프레임 수 (버퍼)</label>
+      <input type="range" id="sl-fr" min="1" max="60" step="1" value="18" oninput="update()">
+      <span class="val" id="vl-fr">18</span>
+    </div>
+    <div class="slider-row">
+      <label>얼굴 미감지 허용 프레임</label>
+      <input type="range" id="sl-nf" min="1" max="60" step="1" value="20" oninput="update()">
+      <span class="val" id="vl-nf">20</span>
+    </div>
+
+    <div style="margin-top:12px;padding-top:12px;border-top:1px solid #334155;font-size:12px;color:#64748b">
+      💡 <strong style="color:#e2e8f0">사용법</strong>: 모니터를 정면으로 보면서 avg가 안정적인 범위를 확인 →
+      그 범위 <em>바깥</em>을 임계값으로 설정. 프레임 버퍼를 높이면 일시적 튐 무시.
+    </div>
+  </div>
+
+  <!-- 이벤트 로그 -->
+  <div class="panel">
+    <h2>이탈 감지 로그</h2>
+    <div class="log-box" id="log-box"></div>
+  </div>
+
+  <!-- avg 통계 -->
+  <div class="panel">
+    <h2>수평 통계 (최근 200프레임)</h2>
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-val green" id="stat-min">—</div>
+        <div class="metric-lbl">최솟값</div>
+      </div>
+      <div class="metric">
+        <div class="metric-val blue" id="stat-avg">—</div>
+        <div class="metric-lbl">평균</div>
+      </div>
+      <div class="metric">
+        <div class="metric-val red" id="stat-max">—</div>
+        <div class="metric-lbl">최댓값</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:#64748b;margin-top:8px">
+      수평 avg 정면 응시 시 ~0.5. 권장 임계: 평균 ± 0.25 이상
+    </div>
+  </div>
+
+  <!-- vavg 통계 -->
+  <div class="panel">
+    <h2>수직 통계 (최근 200프레임)</h2>
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-val green" id="vstat-min">—</div>
+        <div class="metric-lbl">최솟값</div>
+      </div>
+      <div class="metric">
+        <div class="metric-val yellow" id="vstat-avg">—</div>
+        <div class="metric-lbl">평균</div>
+      </div>
+      <div class="metric">
+        <div class="metric-val red" id="vstat-max">—</div>
+        <div class="metric-lbl">최댓값</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:#64748b;margin-top:8px">
+      수직 vavg 정면 응시 시 ~0.5. 위/아래 쳐다볼 때 0 또는 1에 가까워짐
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script>
+const vid=document.getElementById('cam-vid');
+const cvs=document.getElementById('cam-cvs');
+const ctx=cvs.getContext('2d');
+const histCvs=document.getElementById('hist-cvs');
+const histCtx=histCvs.getContext('2d');
+
+let params={lo:0.25,hi:0.75,vlo:0.20,vhi:0.80,frames:18,noface:20};
+let awayFrames=0,nofaceFrames=0;
+let avgHistory=[];
+let statBuffer=[], vstatBuffer=[];
+let lastAway=false;
+let awayStartTime=null;
+
+function update(){
+  params.lo=parseFloat(document.getElementById('sl-lo').value);
+  params.hi=parseFloat(document.getElementById('sl-hi').value);
+  params.vlo=parseFloat(document.getElementById('sl-vlo').value);
+  params.vhi=parseFloat(document.getElementById('sl-vhi').value);
+  params.frames=parseInt(document.getElementById('sl-fr').value);
+  params.noface=parseInt(document.getElementById('sl-nf').value);
+  document.getElementById('vl-lo').textContent=params.lo.toFixed(2);
+  document.getElementById('vl-hi').textContent=params.hi.toFixed(2);
+  document.getElementById('vl-vlo').textContent=params.vlo.toFixed(2);
+  document.getElementById('vl-vhi').textContent=params.vhi.toFixed(2);
+  document.getElementById('vl-fr').textContent=params.frames;
+  document.getElementById('vl-nf').textContent=params.noface;
+  document.getElementById('thr-lo').style.left=(params.lo*100)+'%';
+  document.getElementById('thr-hi').style.left=(params.hi*100)+'%';
+  document.getElementById('vthr-lo').style.left=(params.vlo*100)+'%';
+  document.getElementById('vthr-hi').style.left=(params.vhi*100)+'%';
+  document.getElementById('lo-label').textContent='하한: '+params.lo.toFixed(2);
+  document.getElementById('hi-label').textContent='상한: '+params.hi.toFixed(2);
+  document.getElementById('vlo-label').textContent='위: '+params.vlo.toFixed(2);
+  document.getElementById('vhi-label').textContent='아래: '+params.vhi.toFixed(2);
+  updateCodeOut();
+}
+
+function updateCodeOut(){
+  const code=`const away = (avg<${params.lo.toFixed(2)}||avg>${params.hi.toFixed(2)})||(vavg<${params.vlo.toFixed(2)}||vavg>${params.vhi.toFixed(2)});\nconst AWAY_FRAME_THRESHOLD = ${params.frames};\nconst NOFACE_FRAME_THRESHOLD = ${params.noface};`;
+  document.getElementById('code-out').textContent=code;
+}
+
+function copyCode(){
+  navigator.clipboard.writeText(document.getElementById('code-out').textContent)
+    .then(()=>alert('✅ 클립보드에 복사됐어!'));
+}
+
+function processFrame(avg,vavg,faceDetected){
+  if(!faceDetected){
+    nofaceFrames++;
+    awayFrames=0;
+  }else{
+    nofaceFrames=0;
+    const iris_away=(avg<params.lo||avg>params.hi)||(vavg<params.vlo||vavg>params.vhi);
+    if(iris_away) awayFrames=Math.min(awayFrames+1,params.frames+10);
+    else awayFrames=Math.max(awayFrames-2,0);
+  }
+
+  const noFaceAway=nofaceFrames>=params.noface;
+  const irisAway=awayFrames>=params.frames;
+  const isAway=noFaceAway||irisAway;
+  let reason='';
+  if(!faceDetected) reason='얼굴 미감지';
+  else if(avg<params.lo||avg>params.hi) reason='수평 이탈 (avg='+avg.toFixed(3)+')';
+  else if(vavg<params.vlo||vavg>params.vhi) reason='수직 이탈 (vavg='+vavg.toFixed(3)+')';
+
+  const bar=document.getElementById('status-bar');
+  if(!faceDetected&&nofaceFrames<params.noface){
+    bar.className='status-bar status-noface';bar.textContent='👁 얼굴 탐색 중...';
+  }else if(isAway){
+    bar.className='status-bar status-away';bar.textContent='⚠ 이탈 — '+reason;
+  }else{
+    bar.className='status-bar status-ok';bar.textContent='✅ 시선 정상';
+  }
+
+  document.getElementById('m-avg').textContent=faceDetected?avg.toFixed(3):'—';
+  document.getElementById('m-vavg').textContent=faceDetected?vavg.toFixed(3):'—';
+  document.getElementById('m-vavg').className='metric-val '+(faceDetected?(vavg<params.vlo||vavg>params.vhi?'red':'yellow'):'gray');
+  document.getElementById('m-frames').textContent=awayFrames;
+  document.getElementById('m-face').textContent=faceDetected?'✅':'❌';
+  document.getElementById('m-face').className='metric-val '+(faceDetected?'green':'red');
+
+  if(faceDetected){
+    const pct=(avg*100).toFixed(1);
+    const hfill=document.getElementById('avg-fill');
+    hfill.style.width=pct+'%';
+    hfill.style.background=(avg<params.lo||avg>params.hi)?'#ef4444':avg>0.35&&avg<0.65?'#22c55e':'#fbbf24';
+    const vpct=(vavg*100).toFixed(1);
+    const vfill=document.getElementById('vavg-fill');
+    vfill.style.width=vpct+'%';
+    vfill.style.background=(vavg<params.vlo||vavg>params.vhi)?'#ef4444':vavg>0.3&&vavg<0.7?'#22c55e':'#fbbf24';
+    statBuffer.push(avg);
+    vstatBuffer.push(vavg);
+    avgHistory.push({v:avg,vv:vavg,away:isAway});
+  }else{
+    avgHistory.push({v:null,vv:null,away:isAway});
+  }
+  if(avgHistory.length>100)avgHistory.shift();
+  if(statBuffer.length>200)statBuffer.shift();
+  if(vstatBuffer.length>200)vstatBuffer.shift();
+  drawHist();
+  updateStats();
+
+  if(isAway&&!lastAway){
+    awayStartTime=Date.now();
+    addLog('⚠ 이탈 시작 — '+reason,'log-away');
+  }else if(!isAway&&lastAway&&awayStartTime){
+    const sec=((Date.now()-awayStartTime)/1000).toFixed(1);
+    addLog('✅ 복귀 (이탈 '+sec+'초)','log-ok');
+    awayStartTime=null;
+  }
+  lastAway=isAway;
+}
+
+function drawHist(){
+  const w=histCvs.offsetWidth||400;histCvs.width=w;histCvs.height=60;
+  histCtx.clearRect(0,0,w,60);
+  histCtx.fillStyle='rgba(239,68,68,.08)';
+  histCtx.fillRect(0,0,w,params.lo*60);
+  histCtx.fillRect(0,(1-params.hi)*60,w,60);
+  histCtx.strokeStyle='#334155';histCtx.lineWidth=1;histCtx.setLineDash([4,4]);
+  histCtx.beginPath();histCtx.moveTo(0,30);histCtx.lineTo(w,30);histCtx.stroke();histCtx.setLineDash([]);
+  // 수평 avg (초록/빨강)
+  histCtx.lineWidth=1.5;
+  avgHistory.forEach((pt,i)=>{
+    if(pt.v===null)return;
+    const x=i*(w/100),y=(1-pt.v)*60;
+    histCtx.strokeStyle=pt.away?'#ef4444':'#22c55e';
+    histCtx.beginPath();if(i>0&&avgHistory[i-1].v!==null){histCtx.moveTo((i-1)*(w/100),(1-avgHistory[i-1].v)*60);}else{histCtx.moveTo(x,y);}
+    histCtx.lineTo(x,y);histCtx.stroke();
+  });
+  // 수직 vavg (파랑/주황)
+  avgHistory.forEach((pt,i)=>{
+    if(pt.vv===null)return;
+    const x=i*(w/100),y=(1-pt.vv)*60;
+    histCtx.strokeStyle=pt.away?'#f97316':'#60a5fa';
+    histCtx.beginPath();if(i>0&&avgHistory[i-1].vv!==null){histCtx.moveTo((i-1)*(w/100),(1-avgHistory[i-1].vv)*60);}else{histCtx.moveTo(x,y);}
+    histCtx.lineTo(x,y);histCtx.stroke();
+  });
+}
+
+function updateStats(){
+  if(statBuffer.length){
+    const mn=Math.min(...statBuffer),mx=Math.max(...statBuffer),av=statBuffer.reduce((a,b)=>a+b,0)/statBuffer.length;
+    document.getElementById('stat-min').textContent=mn.toFixed(3);
+    document.getElementById('stat-avg').textContent=av.toFixed(3);
+    document.getElementById('stat-max').textContent=mx.toFixed(3);
+  }
+  if(vstatBuffer.length){
+    const mn=Math.min(...vstatBuffer),mx=Math.max(...vstatBuffer),av=vstatBuffer.reduce((a,b)=>a+b,0)/vstatBuffer.length;
+    document.getElementById('vstat-min').textContent=mn.toFixed(3);
+    document.getElementById('vstat-avg').textContent=av.toFixed(3);
+    document.getElementById('vstat-max').textContent=mx.toFixed(3);
+  }
+}
+
+function addLog(msg,cls){
+  const box=document.getElementById('log-box');
+  const t=new Date().toLocaleTimeString('ko');
+  box.insertAdjacentHTML('afterbegin',`<div class="${cls}">[${t}] ${msg}</div>`);
+  if(box.children.length>50)box.removeChild(box.lastChild);
+}
+
+// MediaPipe
+const fm=new FaceMesh({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`});
+fm.setOptions({maxNumFaces:1,refineLandmarks:true,minDetectionConfidence:.5,minTrackingConfidence:.5});
+fm.onResults(r=>{
+  cvs.width=vid.videoWidth||400;cvs.height=vid.videoHeight||300;
+  ctx.clearRect(0,0,cvs.width,cvs.height);
+  if(!r.multiFaceLandmarks||!r.multiFaceLandmarks.length){
+    processFrame(0.5,0.5,false);return;
+  }
+  const lm=r.multiFaceLandmarks[0];
+  const li=lm[468],ri=lm[473];
+  // 수평
+  const lg=(li.x-lm[33].x)/(lm[133].x-lm[33].x);
+  const rg=(ri.x-lm[362].x)/(lm[263].x-lm[362].x);
+  const avg=(lg+rg)/2;
+  // 수직: 159=오른눈 위, 145=오른눈 아래, 386=왼눈 위, 374=왼눈 아래
+  const rEyeH=lm[145].y-lm[159].y, lEyeH=lm[374].y-lm[386].y;
+  const lv=rEyeH>0.002?Math.max(0,Math.min(1,(li.y-lm[159].y)/rEyeH)):0.5;
+  const rv=lEyeH>0.002?Math.max(0,Math.min(1,(ri.y-lm[386].y)/lEyeH)):0.5;
+  const vavg=(lv+rv)/2;
+
+  const isAway=(avg<params.lo||avg>params.hi)||(vavg<params.vlo||vavg>params.vhi);
+  processFrame(avg,vavg,true);
+
+  const w=cvs.width,h=cvs.height;ctx.save();
+  ctx.fillStyle=isAway?'#ef4444':'#22c55e';
+  [[li.x,li.y],[ri.x,ri.y]].forEach(([x,y])=>{ctx.beginPath();ctx.arc(x*w,y*h,5,0,Math.PI*2);ctx.fill();});
+  ctx.fillStyle='#fff';ctx.font='bold 13px monospace';
+  ctx.fillText(`H: ${avg.toFixed(3)}  V: ${vavg.toFixed(3)}`,10,20);
+  ctx.fillText(`frames: ${awayFrames}/${params.frames}`,10,38);
+  ctx.restore();
+});
+
+navigator.mediaDevices.getUserMedia({video:{width:400,height:300,facingMode:'user'}})
+  .then(stream=>{
+    vid.srcObject=stream;
+    const cam=new Camera(vid,{onFrame:async()=>await fm.send({image:vid}),width:400,height:300});
+    cam.start();
+  })
+  .catch(e=>alert('카메라 접근 실패: '+e.message));
+
+update();
+</script>
+</body>
+</html>
