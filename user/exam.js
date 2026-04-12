@@ -95,11 +95,18 @@ window.startExam=async function(){
   try{
     const r=await apiCall('POST',`/api/student/exams/${examId}/start`);
     const {attempt_id,exam,questions}=r;
+    // Groq API 키 로드 (관리자가 설정한 키를 백엔드에서 가져옴)
+    let groqKey='';
+    try{
+      const ks=await apiCall('GET','/api/student/groq-key');
+      groqKey=ks.groq_key||'';
+    }catch(e){console.warn('Groq 키 로드 실패:',e);}
     Object.assign(S,{
       studentId:id,studentName:name,
       examId:exam.id,attemptId:attempt_id,examName:exam.title,
       duration:exam.duration,timeLeft:exam.duration,
-      questions,answers:{},startTime:Date.now()
+      questions,answers:{},startTime:Date.now(),
+      apiKey:groqKey
     });
     document.getElementById('login-screen').style.display='none';
     document.getElementById('exam-screen').style.display='flex';
