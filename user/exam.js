@@ -52,6 +52,30 @@ async function loadExams(studentId){
   }
 }
 
+// ── 권한 확인 (카메라 + 마이크) ──────────────────────────
+async function checkPermissions(){
+  while(true){
+    try{
+      const stream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+      stream.getTracks().forEach(t=>t.stop()); // 확인 후 즉시 해제
+      return true;
+    }catch(e){
+      const denied=e.name==='NotAllowedError'||e.name==='PermissionDeniedError';
+      const msg=denied
+        ?'⛔ 카메라와 마이크 접근이 거부되었습니다.\n\n시험 응시를 위해 반드시 허용이 필요합니다.\n\n브라우저 주소창 왼쪽 🔒 아이콘 → 카메라/마이크 → 허용\n\n허용 후 확인을 누르세요.'
+        :'⚠️ 카메라 또는 마이크를 찾을 수 없습니다.\n\n장치가 연결되어 있는지 확인 후 확인을 누르세요.';
+      alert(msg);
+      // 허용 여부 재확인
+      try{
+        const pCam=await navigator.permissions.query({name:'camera'});
+        const pMic=await navigator.permissions.query({name:'microphone'});
+        if(pCam.state==='granted'&&pMic.state==='granted')return true;
+      }catch(_){}
+      // 계속 루프 (허용할 때까지)
+    }
+  }
+}
+
 // ── 시험 시작 ─────────────────────────────────────────────
 window.startExam=async function(){
   const id=document.getElementById('l-id').value.trim();
@@ -59,6 +83,12 @@ window.startExam=async function(){
   const examId=document.getElementById('l-exam').value;
   if(!id||!name){alert('학번과 이름을 입력하세요');return;}
   if(!examId){alert('시험을 선택하세요');return;}
+  // 카메라 + 마이크 권한 확인 (허용 전까지 진행 불가)
+  const btn=document.querySelector('[onclick="startExam()"]');
+  if(btn){btn.disabled=true;btn.textContent='권한 확인 중...';}
+  const permitted=await checkPermissions();
+  if(btn){btn.disabled=false;btn.textContent='시험 시작';}
+  if(!permitted)return;
   if(!studentToken){
     if(!await authStudent(id)){alert('인증 실패. 학번을 확인하세요.');return;}
   }
