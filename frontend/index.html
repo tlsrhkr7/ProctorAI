@@ -2,10 +2,29 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="refresh" content="0; url=./admin/admin.html">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ProctorAI</title>
+<style>
+  body{margin:0;background:#0f172a;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif}
+  .wrap{text-align:center;color:#e2e8f0}
+  h1{font-size:2rem;margin-bottom:8px}
+  p{color:#94a3b8;margin-bottom:32px}
+  .btns{display:flex;gap:16px;justify-content:center}
+  a{display:inline-block;padding:14px 32px;border-radius:10px;font-size:15px;font-weight:700;text-decoration:none;transition:.2s}
+  .admin{background:#6366f1;color:#fff}
+  .admin:hover{background:#4f46e5}
+  .student{background:#0f172a;border:2px solid #334155;color:#e2e8f0}
+  .student:hover{background:#1e293b}
+</style>
 </head>
 <body>
-<p>이동 중... <a href="./admin/admin.html">관리자 페이지</a> | <a href="./user/exam.html">응시자 페이지</a></p>
+<div class="wrap">
+  <h1>🎓 ProctorAI</h1>
+  <p>AI 기반 온라인 시험 감독 시스템</p>
+  <div class="btns">
+    <a class="admin" href="./admin/admin.html">관리자 로그인</a>
+    <a class="student" href="./user/exam.html">시험 응시</a>
+  </div>
+</div>
 </body>
 </html>
