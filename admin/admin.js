@@ -154,12 +154,32 @@ window.generateQs=async function(){
   const prompt=`다음 교육 자료를 분석하여 ${diff} 난이도의 4지선다 객관식 문제 ${qcnt}개를 생성하세요.\n\n교육 자료:\n${G.pdfText.substring(0,2000)}\n\n반드시 아래 JSON 형식으로만 응답 (다른 텍스트 없이):\n{"questions":[{"question":"문제 내용","options":["① 보기1","② 보기2","③ 보기3","④ 보기4"],"answer":0,"explanation":"해설"}]}\nanswer는 정답 index(0~3). 반드시 한국어.`;
   try{
     prog(true,'AI가 문제 생성 중...',45);
-    const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({model:'llama-3.1-8b-instant',max_tokens:4000,temperature:.7,messages:[{role:'user',content:prompt}]})});
+    const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({model:'llama-3.1-8b-instant',max_tokens:8000,temperature:.7,messages:[{role:'user',content:prompt}]})});
     prog(true,'응답 파싱 중...',80);
     const data=await res.json();
     if(!res.ok)throw new Error(data.error?.message||'API 오류 '+res.status);
-    const raw=data.choices[0].message.content.trim().replace(/```json|```/g,'').trim();
-    const parsed=JSON.parse(raw);
+    let raw=data.choices[0].message.content.trim().replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
+    // JSON 객체 부분만 추출
+    const jsonMatch=raw.match(/\{[\s\S]*\}/);
+    if(!jsonMatch)throw new Error('JSON 형식 응답을 찾을 수 없습니다');
+    raw=jsonMatch[0];
+    // raw 개행·탭 이스케이프 후 파싱
+    const sanitized=raw.replace(/("(?:[^"\\]|\\.)*")/g,m=>m.replace(/\n/g,'\\n').replace(/\r/g,'\\r').replace(/\t/g,'\\t'));
+    let parsed;
+    try{
+      parsed=JSON.parse(sanitized);
+    }catch(e1){
+      // 토큰 한도로 잘린 경우: 완성된 question 객체만 추출
+      const partialMatch=sanitized.match(/"questions"\s*:\s*(\[[\s\S]*)/);
+      if(!partialMatch)throw new Error('JSON 파싱 실패: '+e1.message);
+      let arr=partialMatch[1];
+      // 마지막 완전한 } 위치까지만 자르기
+      const lastBrace=arr.lastIndexOf('}');
+      if(lastBrace===-1)throw new Error('완성된 문제가 없습니다');
+      arr=arr.substring(0,lastBrace+1)+']';
+      try{parsed={questions:JSON.parse(arr)};}
+      catch(e2){throw new Error('JSON 파싱 실패 (복구 불가): '+e1.message);}
+    }
     G.genQs=parsed.questions;
     prog(true,'완료!',100);setTimeout(()=>prog(false),500);
     renderQPreview(G.genQs);
