@@ -1,6 +1,6 @@
 const API='https://proctorai-production.up.railway.app';
 let studentToken='';
-const S={studentId:'',studentName:'',examId:null,attemptId:null,examName:'',duration:1800,timeLeft:1800,questions:[],answers:{},startTime:null,timerInt:null,warns:0,maxWarns:3,gazeAway:false,gazeAwayTime:0,totalAway:0,gazeTimer:null,gazeThreshold:3,voiceAlerts:0,paused:false,terminated:false,chatTurn:0,chatHistory:[],apiKey:'',recognition:null};
+const S={studentId:'',studentName:'',examId:null,attemptId:null,examName:'',duration:1800,timeLeft:1800,questions:[],answers:{},startTime:null,timerInt:null,warns:0,maxWarns:6,gazeAway:false,gazeAwayTime:0,totalAway:0,gazeTimer:null,gazeThreshold:3,voiceAlerts:0,paused:false,terminated:false,chatTurn:0,chatHistory:[],apiKey:'',recognition:null};
 // 키워드 목록은 Groq API 없을 때 폴백으로만 사용
 const kwds=['답 알려','정답이 뭐','answer is','solution is','뭐가 정답','몇번이야','몇번인지'];
 let _voiceLastCheck=0; // Groq 음성 분석 쿨다운
@@ -208,7 +208,7 @@ function updateGaze(away,val){
   if(stableAway&&!S.gazeAway){S.gazeAway=true;S.gazeAwayTime=0;S.gazeTimer=setInterval(()=>{if(!S.gazeAway||S.paused||S.terminated){clearInterval(S.gazeTimer);return;}S.gazeAwayTime++;S.totalAway++;document.getElementById('st-away').textContent=S.totalAway+'s';if(S.gazeAwayTime>=S.gazeThreshold){gazeWarn();clearInterval(S.gazeTimer);}},1000);}
   else if(!stableAway&&S.gazeAway){S.gazeAway=false;S.gazeAwayTime=0;clearInterval(S.gazeTimer);}
 }
-function gazeWarn(){S.warns++;updateWB();addLog('warn','시선 이탈',`${S.gazeThreshold}초+ (경고 ${S.warns}/${S.maxWarns})`);sendLog('warn','시선 이탈',`${S.gazeThreshold}초+ 이탈 — 경고 ${S.warns}회`);const we=document.getElementById('st-warns');we.textContent=S.warns+'회';we.className='sbox-v '+(S.warns>=S.maxWarns?'d':'w');if(S.warns>=S.maxWarns){terminate('시선 이탈 3회 누적 — 0점 퇴장');}else if(S.warns>=S.maxWarns-1){startChat('gaze');}else{showWarn('시선 이탈 감지',`화면을 ${S.gazeThreshold}초+ 이탈했습니다.\n경고 ${S.warns}/${S.maxWarns}회\n${S.maxWarns-S.warns}회 추가 경고 시 시험이 즉시 종료됩니다.`);flash('w');}}
+function gazeWarn(){S.warns++;updateWB();addLog('warn','시선 이탈',`${S.gazeThreshold}초+ (경고 ${S.warns}/${S.maxWarns})`);sendLog('warn','시선 이탈',`${S.gazeThreshold}초+ 이탈 — 경고 ${S.warns}회`);const we=document.getElementById('st-warns');we.textContent=S.warns+'회';we.className='sbox-v '+(S.warns>=S.maxWarns?'d':'w');if(S.warns>=S.maxWarns){terminate('경고 누적 — 0점 퇴장');}else if(S.warns%2===0){startChat('gaze');}else{showWarn('시선 이탈 감지',`화면을 ${S.gazeThreshold}초 이상 이탈했습니다.\n경고 ${S.warns}회`);flash('w');}}
 
 // ── Groq 음성 분석 ────────────────────────────────────────
 async function analyzeVoiceGroq(text){
@@ -236,9 +236,9 @@ function triggerVoiceWarn(text){
   addLog('danger','음성 경고',`의심 발언: "${text.substring(0,40)}"`);
   sendLog('danger','음성 경고',`의심 발언: "${text.substring(0,40)}"`);
   S.warns++;updateWB();
-  if(S.warns>=S.maxWarns){terminate('의심 발언 3회 누적 — 0점 퇴장');}
-  else if(S.warns>=S.maxWarns-1){startChat('voice');}
-  else{showWarn('의심 발언 감지',`"${text.substring(0,30)}" 감지\n경고 ${S.warns}/${S.maxWarns}회\n${S.maxWarns-S.warns}회 추가 경고 시 시험이 즉시 종료됩니다.`);flash('d');}
+  if(S.warns>=S.maxWarns){terminate('경고 누적 — 0점 퇴장');}
+  else if(S.warns%2===0){startChat('voice');}
+  else{showWarn('의심 발언 감지',`"${text.substring(0,30)}" 감지\n경고 ${S.warns}회`);flash('d');}
 }
 
 // ── 음성 감지 ─────────────────────────────────────────────
@@ -275,9 +275,9 @@ function initWindowGuard(){
       addLog('warn','화면 이탈','다른 탭/창으로 전환');
       sendLog('warn','화면 이탈','다른 탭 또는 창으로 전환됨');
       S.warns++;updateWB();
-      if(S.warns>=S.maxWarns){terminate('화면 이탈 3회 누적 — 0점 퇴장');}
-      else if(S.warns>=S.maxWarns-1){startChat('window');}
-      else{showWarn('화면 이탈 감지',`다른 창 또는 탭으로 전환되었습니다.\n경고 ${S.warns}/${S.maxWarns}회\n${S.maxWarns-S.warns}회 추가 경고 시 시험이 즉시 종료됩니다.`);flash('w');}
+      if(S.warns>=S.maxWarns){terminate('경고 누적 — 0점 퇴장');}
+      else if(S.warns%2===0){startChat('window');}
+      else{showWarn('화면 이탈 감지',`다른 창 또는 탭으로 전환되었습니다.\n경고 ${S.warns}회`);flash('w');}
     }else{
       const sec=hiddenAt?Math.round((Date.now()-hiddenAt)/1000):0;
       addLog('info','화면 복귀',`${sec}초 후 복귀`);
@@ -293,9 +293,9 @@ function initWindowGuard(){
       addLog('warn','창 포커스 이탈','다른 프로그램/창으로 전환 (3초+)');
       sendLog('warn','창 포커스 이탈','다른 프로그램/창으로 전환됨');
       S.warns++;updateWB();
-      if(S.warns>=S.maxWarns){terminate('창 이탈 3회 누적 — 0점 퇴장');}
-      else if(S.warns>=S.maxWarns-1){startChat('window');}
-      else{showWarn('창 전환 감지',`다른 프로그램 또는 최소화가 감지되었습니다.\n경고 ${S.warns}/${S.maxWarns}회\n${S.maxWarns-S.warns}회 추가 경고 시 시험이 즉시 종료됩니다.`);flash('w');}
+      if(S.warns>=S.maxWarns){terminate('경고 누적 — 0점 퇴장');}
+      else if(S.warns%2===0){startChat('window');}
+      else{showWarn('창 전환 감지',`다른 프로그램 또는 최소화가 감지되었습니다.\n경고 ${S.warns}회`);flash('w');}
     },3000);
   });
   window.addEventListener('focus',()=>{
@@ -317,7 +317,7 @@ function initWindowGuard(){
 function showWarn(title,msg){if(S.paused||S.terminated)return;document.getElementById('ov-warn-title').textContent=title;document.getElementById('ov-warn-msg').textContent=msg;document.getElementById('ov-warn').classList.add('act');S.paused=true;document.getElementById('exam-content').classList.add('blurred');setStatus('w','경고 '+S.warns+'/'+S.maxWarns);setTimeout(()=>{if(document.getElementById('ov-warn').classList.contains('act'))dismissWarn();},8000);}
 window.dismissWarn=()=>{document.getElementById('ov-warn').classList.remove('act');S.paused=false;S.gazeAway=false;S.gazeAwayTime=0;clearInterval(S.gazeTimer);_awayFrames=0;_nofaceFrames=0;document.getElementById('exam-content').classList.remove('blurred');setStatus('ok','정상 감독 중');addLog('info','경고 확인','재개');};
 function flash(t){const el=document.getElementById('b-flash');el.className='b-flash bf-'+t;setTimeout(()=>el.className='b-flash',2000);}
-function updateWB(){for(let i=1;i<=3;i++){const b=document.getElementById('wb'+i);if(i<=S.warns)b.classList.add(i===S.maxWarns?'crit':'used');}}
+function updateWB(){for(let i=1;i<=6;i++){const b=document.getElementById('wb'+i);if(!b)return;if(i<=S.warns)b.classList.add(i===S.maxWarns?'crit':'used');}}
 
 // ── AI 면담 (로직 동일) ───────────────────────────────────
 async function startChat(reason){
@@ -342,7 +342,7 @@ async function getAIReply(){
   return sims[Math.min(S.chatTurn-1,2)];
 }
 function typeMsg(role,text){return new Promise(res=>{const c=document.getElementById('chat-msgs');const d=document.createElement('div');d.className='chat-msg cm-'+role;c.appendChild(d);c.scrollTop=c.scrollHeight;if(role==='ai'){const t=document.createElement('div');t.className='typing';t.innerHTML='<div class="tdot"></div><div class="tdot"></div><div class="tdot"></div>';d.appendChild(t);c.scrollTop=c.scrollHeight;setTimeout(()=>{d.innerHTML=text.replace(/\n/g,'<br>');c.scrollTop=c.scrollHeight;res();},900+Math.random()*700);}else{d.textContent=text;c.scrollTop=c.scrollHeight;res();}});}
-window.resumeChat=()=>{document.getElementById('ov-chat').classList.remove('act');S.paused=false;S.warns=0;S.gazeAway=false;S.gazeAwayTime=0;clearInterval(S.gazeTimer);_awayFrames=0;_nofaceFrames=0;for(let i=1;i<=3;i++){const b=document.getElementById('wb'+i);b.classList.remove('used','crit');}document.getElementById('exam-content').classList.remove('blurred');setStatus('ok','정상 감독 중');addLog('ok','시험 재개','면담 완료');sendLog('ok','시험 재개','면담 후 재개');if(S.recognition){try{S.recognition.start();}catch(_){}}};
+window.resumeChat=()=>{document.getElementById('ov-chat').classList.remove('act');S.paused=false;S.gazeAway=false;S.gazeAwayTime=0;clearInterval(S.gazeTimer);_awayFrames=0;_nofaceFrames=0;document.getElementById('exam-content').classList.remove('blurred');setStatus('ok','정상 감독 중');addLog('ok','시험 재개','면담 완료');sendLog('ok','시험 재개','면담 후 재개');if(S.recognition){try{S.recognition.start();}catch(_){}}};
 
 // ── 제출 / 강제 종료 (API 연동) ──────────────────────────
 window.submitExam=async function(){
