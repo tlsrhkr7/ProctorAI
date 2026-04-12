@@ -1,7 +1,7 @@
 const API='https://proctorai-production.up.railway.app';
 let token=localStorage.getItem('admin_token')||'';
 let _pollTimer=null;
-const G={logs:[],exams:[],pdfText:'',genQs:[]};
+const G={logs:[],exams:[],pdfImages:[],pdfPageCount:0,genQs:[]};
 
 // ── API 헬퍼 ──────────────────────────────────────────────
 async function api(method,path,body){
@@ -117,62 +117,87 @@ window.nav=(name,btn)=>{
 // ── PDF ───────────────────────────────────────────────────
 window.handleDrop=e=>{e.preventDefault();document.getElementById('upload-zone').classList.remove('drag');const f=e.dataTransfer.files[0];if(f&&f.type==='application/pdf')processPdf(f);};
 window.handleFile=e=>{const f=e.target.files[0];if(f)processPdf(f);};
-window.clearPdf=()=>{G.pdfText='';document.getElementById('pdf-chip').style.display='none';document.getElementById('pdf-preview').style.display='none';document.getElementById('gen-btn').disabled=true;document.getElementById('gen-status').textContent='PDF를 먼저 업로드하세요';document.getElementById('pdf-inp').value='';};
+window.clearPdf=()=>{G.pdfImages=[];G.pdfPageCount=0;document.getElementById('pdf-chip').style.display='none';document.getElementById('pdf-preview').style.display='none';document.getElementById('gen-btn').disabled=true;document.getElementById('gen-status').textContent='PDF를 먼저 업로드하세요';document.getElementById('pdf-inp').value='';};
 
 async function processPdf(file){
   document.getElementById('pdf-name').textContent=file.name;
   document.getElementById('pdf-size').textContent=(file.size/1024).toFixed(1)+' KB';
   document.getElementById('pdf-chip').style.display='flex';
-  document.getElementById('gen-status').textContent='📖 텍스트 추출 중...';
+  document.getElementById('gen-status').textContent='🖼 PDF 이미지 변환 중...';
   try{
     pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     const buf=await file.arrayBuffer();
     const pdf=await pdfjsLib.getDocument({data:buf}).promise;
-    let txt='';
-    for(let i=1;i<=Math.min(pdf.numPages,20);i++){const pg=await pdf.getPage(i);const tc=await pg.getTextContent();txt+=tc.items.map(t=>t.str).join(' ')+'\n';}
-    G.pdfText=txt.trim();
-    document.getElementById('pdf-prev-text').textContent=G.pdfText.substring(0,300)+(G.pdfText.length>300?'...':'');
+    G.pdfPageCount=pdf.numPages;
+    const maxPages=Math.min(pdf.numPages,5); // 최대 5페이지 (토큰 절약)
+    G.pdfImages=[];
+    for(let i=1;i<=maxPages;i++){
+      document.getElementById('gen-status').textContent=`🖼 이미지 변환 중... (${i}/${maxPages}페이지)`;
+      const pg=await pdf.getPage(i);
+      // 800px 기준 스케일 계산 (너무 크면 토큰 과다)
+      const vp0=pg.getViewport({scale:1});
+      const scale=Math.min(800/vp0.width,1.5);
+      const vp=pg.getViewport({scale});
+      const canvas=document.createElement('canvas');
+      canvas.width=vp.width;canvas.height=vp.height;
+      await pg.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
+      // JPEG 65% 품질로 압축
+      G.pdfImages.push(canvas.toDataURL('image/jpeg',0.65).split(',')[1]);
+    }
+    // 미리보기: 1페이지 썸네일
+    const prev=document.createElement('img');
+    prev.src='data:image/jpeg;base64,'+G.pdfImages[0];
+    prev.style.cssText='max-width:100%;border-radius:6px;max-height:150px;object-fit:contain;';
+    const previewEl=document.getElementById('pdf-prev-text');
+    previewEl.innerHTML='';previewEl.appendChild(prev);
     document.getElementById('pdf-preview').style.display='block';
     document.getElementById('gen-btn').disabled=false;
-    document.getElementById('gen-status').textContent=`✅ ${pdf.numPages}페이지 추출 완료`;
-  }catch(e){document.getElementById('gen-status').textContent='❌ 추출 실패: '+e.message;}
+    document.getElementById('gen-status').textContent=`✅ ${maxPages}/${pdf.numPages}페이지 변환 완료`;
+  }catch(e){document.getElementById('gen-status').textContent='❌ 변환 실패: '+e.message;}
 }
 
 // ── AI 문제 생성 (Groq 직접 호출) ────────────────────────
 window.generateQs=async function(){
   const key=localStorage.getItem('groq_key');
   if(!key){alert('설정에서 Groq API 키를 먼저 입력하세요!');nav('settings',document.querySelectorAll('.sb-btn')[5]);return;}
-  if(!G.pdfText){alert('PDF를 먼저 업로드하세요');return;}
+  if(!G.pdfImages.length){alert('PDF를 먼저 업로드하세요');return;}
   const qcnt=document.getElementById('n-qcnt').value;
   const diff=document.getElementById('n-diff').value;
-  prog(true,'Groq llama3 요청 중...',15);
+  prog(true,'Vision AI 요청 중...',15);
   document.getElementById('gen-btn').disabled=true;
   document.getElementById('q-preview').innerHTML='';
   document.getElementById('save-sec').style.display='none';
   G.genQs=[];
-  const prompt=`다음 교육 자료를 분석하여 ${diff} 난이도의 4지선다 객관식 문제 ${qcnt}개를 생성하세요.\n\n교육 자료:\n${G.pdfText.substring(0,2000)}\n\n반드시 아래 JSON 형식으로만 응답 (다른 텍스트 없이):\n{"questions":[{"question":"문제 내용","options":["① 보기1","② 보기2","③ 보기3","④ 보기4"],"answer":0,"explanation":"해설"}]}\nanswer는 정답 index(0~3). 반드시 한국어.`;
+  const prompt=`이 PDF 페이지 이미지들을 분석하여 ${diff} 난이도의 4지선다 객관식 문제 ${qcnt}개를 생성하세요.\n\n반드시 아래 JSON 형식으로만 응답 (다른 텍스트 절대 없이):\n{"questions":[{"question":"문제 내용","options":["① 보기1","② 보기2","③ 보기3","④ 보기4"],"answer":0,"explanation":"해설"}]}\nanswer는 정답 index(0~3). 반드시 한국어로 작성.`;
+  // 이미지 content 배열 구성 (페이지별 이미지 + 텍스트 프롬프트)
+  const imgContents=G.pdfImages.map(b64=>({type:'image_url',image_url:{url:`data:image/jpeg;base64,${b64}`}}));
   try{
-    prog(true,'AI가 문제 생성 중...',45);
-    const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({model:'llama-3.1-8b-instant',max_tokens:8000,temperature:.7,messages:[{role:'user',content:prompt}]})});
+    prog(true,'Vision AI가 이미지 분석 중...',45);
+    const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},
+      body:JSON.stringify({
+        model:'meta-llama/llama-4-scout-17b-16e-instruct', // Vision 지원 모델
+        max_tokens:8000,
+        temperature:.7,
+        messages:[{role:'user',content:[...imgContents,{type:'text',text:prompt}]}]
+      })
+    });
     prog(true,'응답 파싱 중...',80);
     const data=await res.json();
     if(!res.ok)throw new Error(data.error?.message||'API 오류 '+res.status);
     let raw=data.choices[0].message.content.trim().replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
-    // JSON 객체 부분만 추출
     const jsonMatch=raw.match(/\{[\s\S]*\}/);
     if(!jsonMatch)throw new Error('JSON 형식 응답을 찾을 수 없습니다');
     raw=jsonMatch[0];
-    // raw 개행·탭 이스케이프 후 파싱
     const sanitized=raw.replace(/("(?:[^"\\]|\\.)*")/g,m=>m.replace(/\n/g,'\\n').replace(/\r/g,'\\r').replace(/\t/g,'\\t'));
     let parsed;
     try{
       parsed=JSON.parse(sanitized);
     }catch(e1){
-      // 토큰 한도로 잘린 경우: 완성된 question 객체만 추출
       const partialMatch=sanitized.match(/"questions"\s*:\s*(\[[\s\S]*)/);
       if(!partialMatch)throw new Error('JSON 파싱 실패: '+e1.message);
       let arr=partialMatch[1];
-      // 마지막 완전한 } 위치까지만 자르기
       const lastBrace=arr.lastIndexOf('}');
       if(lastBrace===-1)throw new Error('완성된 문제가 없습니다');
       arr=arr.substring(0,lastBrace+1)+']';
@@ -183,7 +208,7 @@ window.generateQs=async function(){
     prog(true,'완료!',100);setTimeout(()=>prog(false),500);
     renderQPreview(G.genQs);
     document.getElementById('save-sec').style.display='block';
-    document.getElementById('gen-status').textContent=`✅ ${G.genQs.length}문항 생성 완료`;
+    document.getElementById('gen-status').textContent=`✅ ${G.genQs.length}문항 생성 완료 (${G.pdfImages.length}페이지 분석)`;
   }catch(e){prog(false);document.getElementById('gen-status').textContent='❌ 실패: '+e.message;}
   document.getElementById('gen-btn').disabled=false;
 };
@@ -207,7 +232,7 @@ window.saveExam=async function(){
     const exam=await api('POST','/api/exams',{
       title:name,
       duration:parseInt(document.getElementById('n-dur').value),
-      source_text:G.pdfText||null
+      source_text:null
     });
     prog(true,'문제 저장 중...',50);
     for(let i=0;i<G.genQs.length;i++){
