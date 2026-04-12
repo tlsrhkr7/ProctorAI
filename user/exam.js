@@ -305,6 +305,13 @@ window.resumeChat=()=>{document.getElementById('ov-chat').classList.remove('act'
 // ── 제출 / 강제 종료 (API 연동) ──────────────────────────
 window.submitExam=async function(){
   if(S.terminated)return;
+  // 미답변 문항 확인
+  const unanswered=S.questions.filter(q=>S.answers[q.id]===undefined);
+  if(unanswered.length>0){
+    const nums=unanswered.map(q=>q.number).join(', ');
+    const ok=confirm(`아직 답하지 않은 문항이 있습니다.\n\n미답변: ${nums}번 (${unanswered.length}문항)\n\n그래도 제출하시겠습니까?\n미답변 문항은 0점 처리됩니다.`);
+    if(!ok)return;
+  }
   S.terminated=true;S.paused=true;
   clearInterval(S.timerInt);
   if(S.recognition){try{S.recognition.stop();}catch(_){}}
