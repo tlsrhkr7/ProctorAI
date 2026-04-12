@@ -90,6 +90,35 @@ if user_to_rename:
 else:
     print("  ℹ️  'stu2' 사용자 없음")
 
+# 관리자 계정: prof/1234 → admin/1234
+admin_user = next((u for u in users if u['name'] == 'prof'), None)
+if admin_user:
+    uid = admin_user['id']
+    r1 = c.patch(f"/api/auth/users/{uid}/name", json={"name": "admin"}, headers=ah)
+    r2 = c.patch(f"/api/auth/users/{uid}/password", json={"password": "1234"}, headers=ah)
+    if r1.status_code == 200:
+        print(f"  ✅ 관리자 이름 변경: 'prof' → 'admin'")
+        # 토큰 재발급 (이름 변경됐으므로)
+        login_r = c.post("/api/auth/login", json={"name": "admin", "password": "1234"})
+        if login_r.status_code == 200:
+            token = login_r.json()["token"]
+            ah = {"Authorization": f"Bearer {token}"}
+            print(f"  ✅ 토큰 재발급 완료")
+    elif r1.status_code in (404, 405):
+        print(f"  ⏳ PATCH /api/auth/users 엔드포인트 배포 대기 중 ({r1.status_code}) — 나중에 재실행")
+    else:
+        print(f"  ❌ 관리자 이름 변경 실패: {r1.text}")
+    if r2.status_code == 200:
+        print(f"  ✅ 관리자 비밀번호 유지: 1234")
+    elif r2.status_code in (404, 405):
+        print(f"  ⏳ 비밀번호 변경 엔드포인트 배포 대기 중")
+    else:
+        print(f"  ❌ 비밀번호 변경 실패: {r2.text}")
+elif next((u for u in users if u['name'] == 'admin'), None):
+    print(f"  ℹ️  이미 'admin' 계정 존재")
+else:
+    print(f"  ℹ️  'prof' 계정 없음")
+
 # ─── 문제 검증 및 수정 ───────────────────────────────────
 exams = get_list(c.get("/api/exams", headers=ah))  # 이름 변경 후 재로드
 

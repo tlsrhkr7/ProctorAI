@@ -78,3 +78,18 @@ async def rename_user(user_id: int, body: dict, user: dict = Depends(require_adm
             raise HTTPException(400, "name already exists")
         await cur.execute("UPDATE users SET name = %s WHERE id = %s", (new_name, user_id))
     return {"id": user_id, "name": new_name}
+
+
+# PATCH /api/auth/users/{user_id}/password — 비밀번호 변경 (관리자)
+@router.patch("/users/{user_id}/password")
+async def change_password(user_id: int, body: dict, user: dict = Depends(require_admin)):
+    new_pw = body.get("password", "").strip()
+    if not new_pw:
+        raise HTTPException(400, "password required")
+    async with get_conn() as (conn, cur):
+        await cur.execute("SELECT id FROM users WHERE id = %s", (user_id,))
+        if not await cur.fetchone():
+            raise HTTPException(404, "user not found")
+        await cur.execute("UPDATE users SET password_hash = %s WHERE id = %s",
+                          (hash_password(new_pw), user_id))
+    return {"id": user_id, "updated": True}
