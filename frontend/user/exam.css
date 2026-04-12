@@ -45,6 +45,7 @@ select.inp{appearance:none;cursor:pointer;}
 .warn-badges{display:flex;gap:5px;}
 .wb{width:22px;height:22px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;transition:background .3s;}
 .wb.used{background:var(--warn);color:#000;}.wb.crit{background:var(--danger);color:#fff;}
+.wbs{width:6px;height:1px;background:var(--border);border-radius:1px;align-self:center;}
 .exam-layout{display:grid;grid-template-columns:1fr 300px;min-height:calc(100vh - 54px);}
 .exam-content{padding:28px;overflow-y:auto;}
 .exam-paper{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:36px;max-width:700px;margin:0 auto;}
