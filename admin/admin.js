@@ -173,8 +173,8 @@ window.generateQs=async function(){
     '보통':'개념 이해와 간단한 적용을 요구하는 문제. 자료를 이해해야 풀 수 있는 수준.',
     '어려움':'개념 간 관계 분석, 응용, 추론이 필요한 문제. 자료를 깊이 이해하고 응용해야 하는 수준.'
   };
-  const prompt=`이미지의 교육 자료를 분석하여 4지선다 문제 ${qcnt}개를 만드세요.\n\n난이도: ${diff}\n기준: ${diffGuide[diff]||diff}\n\n출력 규칙:\n- JSON 외 다른 텍스트 일절 금지\n- 아래 형식 그대로 출력\n\n{"questions":[{"question":"문제","options":["보기1","보기2","보기3","보기4"],"answer":0,"explanation":"해설"}]}\n\nanswer=정답 인덱스(0~3). 한국어 필수.`;
-  // 이미지 content 배열 구성 (페이지별 이미지 + 텍스트 프롬프트)
+  const sysPrompt=`You are a JSON-only exam question generator. Output ONLY valid JSON, no markdown, no explanation. Format: {"questions":[{"question":"...","options":["...","...","...","..."],"answer":0,"explanation":"..."}]}`;
+  const userPrompt=`이미지의 교육 자료를 분석하여 ${diff} 난이도(${diffGuide[diff]||diff}) 4지선다 문제 ${qcnt}개를 생성하세요. 한국어. answer는 정답 인덱스(0~3).`;
   const imgContents=G.pdfImages.map(b64=>({type:'image_url',image_url:{url:`data:image/jpeg;base64,${b64}`}}));
   try{
     prog(true,'Vision AI가 이미지 분석 중...',45);
@@ -185,16 +185,23 @@ window.generateQs=async function(){
         model:'meta-llama/llama-4-scout-17b-16e-instruct',
         max_tokens:8000,
         temperature:.2,
-        messages:[{role:'user',content:[...imgContents,{type:'text',text:prompt}]}]
+        response_format:{type:'json_object'},
+        messages:[
+          {role:'system',content:sysPrompt},
+          {role:'user',content:[...imgContents,{type:'text',text:userPrompt}]}
+        ]
       })
     });
     prog(true,'응답 파싱 중...',80);
     const data=await res.json();
     if(!res.ok)throw new Error(data.error?.message||'API 오류 '+res.status);
     const rawContent=data.choices[0].message.content;
-    console.log('[AI RAW]',rawContent); // 디버그용
-    const parsed=parseAIResponse(rawContent);
-    if(!parsed||!parsed.questions?.length)throw new Error('문제 파싱 실패 — 콘솔(F12)에서 AI 응답 확인');
+    console.log('[AI RAW]',rawContent);
+    // response_format:json_object → 바로 파싱 시도, 실패 시 복구
+    let parsed;
+    try{parsed=JSON.parse(rawContent);}
+    catch(_){parsed=parseAIResponse(rawContent);}
+    if(!parsed?.questions?.length)throw new Error('문제 파싱 실패 — F12 콘솔에서 AI 응답 확인');
     G.genQs=parsed.questions;
     prog(true,'완료!',100);setTimeout(()=>prog(false),500);
     renderQPreview(G.genQs);
