@@ -1,5 +1,5 @@
 const API='https://proctorai-production.up.railway.app';
-let token=localStorage.getItem('admin_token')||'';
+let token=sessionStorage.getItem('admin_token')||'';
 let _pollTimer=null;
 const G={logs:[],exams:[],pdfImages:[],pdfPageCount:0,genQs:[]};
 
@@ -35,7 +35,7 @@ function injectLoginModal(){
 async function performLogin(name,pw){
   const r=await api('POST','/api/auth/login',{name,password:pw});
   token=r.token;
-  localStorage.setItem('admin_token',token);
+  sessionStorage.setItem('admin_token',token);
   localStorage.setItem('admin_name',name);
   document.getElementById('login-modal').style.display='none';
   document.getElementById('admin-name-disp').textContent=name;
@@ -64,7 +64,7 @@ window.doRegister=async function(){
 window.doLogout=function(){
   if(!confirm('로그아웃 하시겠습니까?'))return;
   token='';
-  localStorage.removeItem('admin_token');
+  sessionStorage.removeItem('admin_token');
   if(_pollTimer){clearInterval(_pollTimer);_pollTimer=null;}
   document.getElementById('login-modal').style.display='flex';
   document.getElementById('lm-name').value='';
@@ -688,7 +688,7 @@ window.closeResultModal=()=>{document.getElementById('res-modal').style.display=
   document.getElementById('set-admin').value=an;
   if(token){
     try{await api('GET','/api/auth/me');loadAll();}
-    catch{token='';localStorage.removeItem('admin_token');document.getElementById('login-modal').style.display='flex';}
+    catch{token='';sessionStorage.removeItem('admin_token');document.getElementById('login-modal').style.display='flex';}
   }else{
     document.getElementById('login-modal').style.display='flex';
   }
