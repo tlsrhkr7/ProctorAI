@@ -20,12 +20,12 @@ async def get_settings(user: dict = Depends(require_admin)):
     return row if row else DEFAULTS
 
 
-# GET /api/student/settings — 학생용 설정 조회 (groq_key + 감독 기준)
+# GET /api/student/settings — 학생용 설정 조회 (감독 기준만, groq_key 제외)
 @router.get("/student/settings")
 async def get_student_settings(user: dict = Depends(get_current_user)):
     async with get_conn() as (conn, cur):
         await cur.execute(
-            """SELECT s.groq_key, s.gaze_threshold, s.max_warnings
+            """SELECT s.gaze_threshold, s.max_warnings
                  FROM settings s
                  JOIN users u ON u.id = s.user_id
                 WHERE u.role = 'admin'
@@ -34,18 +34,10 @@ async def get_student_settings(user: dict = Depends(get_current_user)):
         row = await cur.fetchone()
     if row:
         return {
-            "groq_key": row["groq_key"] or "",
             "gaze_threshold": row["gaze_threshold"] or 3,
             "max_warnings": row["max_warnings"] or 6,
         }
-    return {"groq_key": "", "gaze_threshold": 3, "max_warnings": 6}
-
-
-# GET /api/student/groq-key — 하위호환용 (student/settings로 통합)
-@router.get("/student/groq-key")
-async def get_groq_key(user: dict = Depends(get_current_user)):
-    s = await get_student_settings(user)
-    return {"groq_key": s["groq_key"]}
+    return {"gaze_threshold": 3, "max_warnings": 6}
 
 
 # PUT /api/admin/settings — 설정 저장

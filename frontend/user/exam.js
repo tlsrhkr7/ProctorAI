@@ -1,6 +1,6 @@
 const API='https://proctorai-production.up.railway.app';
 let studentToken='';
-const S={studentId:'',studentName:'',examId:null,attemptId:null,examName:'',duration:1800,timeLeft:1800,questions:[],answers:{},startTime:null,timerInt:null,cmdPollInt:null,warns:0,maxWarns:6,gazeAway:false,gazeAwayTime:0,totalAway:0,gazeTimer:null,gazeThreshold:3,voiceAlerts:0,paused:false,terminated:false,chatTurn:0,chatHistory:[],apiKey:'',recognition:null};
+const S={studentId:'',studentName:'',examId:null,attemptId:null,examName:'',duration:1800,timeLeft:1800,questions:[],answers:{},startTime:null,timerInt:null,cmdPollInt:null,warns:0,maxWarns:6,gazeAway:false,gazeAwayTime:0,totalAway:0,gazeTimer:null,gazeThreshold:3,voiceAlerts:0,paused:false,terminated:false,chatTurn:0,chatHistory:[],recognition:null};
 // 키워드 목록은 Groq API 없을 때 폴백으로만 사용
 const kwds=['답 알려','정답이 뭐','answer is','solution is','뭐가 정답','몇번이야','몇번인지'];
 let _voiceLastCheck=0; // Groq 음성 분석 쿨다운
@@ -96,11 +96,10 @@ window.startExam=async function(){
   try{
     const r=await apiCall('POST',`/api/student/exams/${examId}/start`);
     const {attempt_id,exam,questions}=r;
-    // 관리자 설정 로드 (Groq 키 + 감독 기준)
-    let groqKey='';let maxW=6;let gazeT=3;
+    // 관리자 설정 로드 (감독 기준 — Groq 키는 서버에서만 보관)
+    let maxW=6;let gazeT=3;
     try{
       const cfg=await apiCall('GET','/api/student/settings');
-      groqKey=cfg.groq_key||'';
       maxW=cfg.max_warnings||6;
       gazeT=cfg.gaze_threshold||3;
     }catch(e){console.warn('설정 로드 실패:',e);}
@@ -109,7 +108,7 @@ window.startExam=async function(){
       examId:exam.id,attemptId:attempt_id,examName:exam.title,
       duration:exam.duration,timeLeft:exam.duration,
       questions,answers:{},startTime:Date.now(),
-      apiKey:groqKey,maxWarns:maxW,gazeThreshold:gazeT
+      maxWarns:maxW,gazeThreshold:gazeT
     });
     document.getElementById('login-screen').style.display='none';
     document.getElementById('exam-screen').style.display='flex';
@@ -215,24 +214,23 @@ function updateGaze(away,val){
 }
 function gazeWarn(){S.warns++;updateWB();addLog('warn','시선 이탈',`${S.gazeThreshold}초+ (경고 ${S.warns}/${S.maxWarns})`);sendLog('warn','시선 이탈',`${S.gazeThreshold}초+ 이탈 — 경고 ${S.warns}회`);const we=document.getElementById('st-warns');we.textContent=S.warns+'회';we.className='sbox-v '+(S.warns>=S.maxWarns?'d':'w');if(S.warns>=S.maxWarns){terminate('경고 누적 — 0점 퇴장');}else if(S.warns%2===0){startChat('gaze');}else{showWarn('시선 이탈 감지',`화면을 ${S.gazeThreshold}초 이상 이탈했습니다.\n경고 ${S.warns}회`);flash('w');}}
 
-// ── Groq 음성 분석 ────────────────────────────────────────
+// ── Groq 음성 분석 (백엔드 프록시 — 키 노출 없음) ─────────
 async function analyzeVoiceGroq(text){
-  if(!S.apiKey)return kwds.some(k=>text.toLowerCase().includes(k)); // 폴백: 키워드 매칭
   const now=Date.now();
   if(now-_voiceLastCheck<5000)return false; // 5초 쿨다운
   _voiceLastCheck=now;
   const topics=S.questions.slice(0,3).map(q=>q.text||'').join(' / ');
   const prompt=`시험 감독 중입니다. 응시자 발언: "${text}"\n시험 주제: ${topics}\n\n이 발언이 부정행위(답 요청, 문제 내용 언급, 타인에게 도움 요청)에 해당하면 YES, 아니면 NO만 답하세요.`;
   try{
-    const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':`Bearer ${S.apiKey}`},
-      body:JSON.stringify({model:'llama-3.1-8b-instant',max_tokens:5,temperature:0,messages:[{role:'user',content:prompt}]})
+    const d=await apiCall('POST','/api/student/groq/chat',{
+      model:'llama-3.1-8b-instant',max_tokens:5,temperature:0,
+      messages:[{role:'user',content:prompt}]
     });
-    if(!res.ok)return false;
-    const d=await res.json();
     return d.choices[0].message.content.trim().toUpperCase().startsWith('YES');
-  }catch(e){console.warn('Groq voice:',e);return false;}
+  }catch(e){
+    console.warn('Groq voice:',e);
+    return kwds.some(k=>text.toLowerCase().includes(k)); // 폴백: 키워드 매칭
+  }
 }
 
 function triggerVoiceWarn(text){
@@ -347,9 +345,19 @@ window.sendChat=async function(){
   if(S.chatTurn>=3){document.getElementById('resume-btn').style.display='inline-flex';addLog('info','AI 면담','완료');}
 };
 async function getAIReply(){
-  if(S.apiKey){try{const sys=`당신은 온라인 시험 감독 AI. 응시자 ${S.studentName}(${S.studentId}), 시험: ${S.examName}. 2~3문장 한국어만.`;const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${S.apiKey}`},body:JSON.stringify({model:'llama-3.1-8b-instant',max_tokens:250,temperature:.7,messages:[{role:'system',content:sys},...S.chatHistory]})});if(res.ok){const d=await res.json();return d.choices[0].message.content.trim();}}catch(e){console.warn(e);}}
-  const sims=[`이해합니다, ${S.studentName}님. 혹시 주변 소리나 다른 화면으로 인해 시선이 이탈된 이유를 설명해 주시겠습니까?`,'말씀 감사합니다. 추가 위반 시 시험이 자동 종료됩니다. 이해하셨나요?','확인되었습니다. 면담을 종료하겠습니다. 최선을 다해 응시해 주세요.'];
-  return sims[Math.min(S.chatTurn-1,2)];
+  // 백엔드 프록시 경유 — API 키가 브라우저에 전달되지 않음
+  try{
+    const sys=`당신은 온라인 시험 감독 AI. 응시자 ${S.studentName}(${S.studentId}), 시험: ${S.examName}. 2~3문장 한국어만.`;
+    const d=await apiCall('POST','/api/student/groq/chat',{
+      model:'llama-3.1-8b-instant',max_tokens:250,temperature:.7,
+      system:sys,messages:S.chatHistory
+    });
+    return d.choices[0].message.content.trim();
+  }catch(e){
+    console.warn('getAIReply:',e);
+    const sims=[`이해합니다, ${S.studentName}님. 혹시 주변 소리나 다른 화면으로 인해 시선이 이탈된 이유를 설명해 주시겠습니까?`,'말씀 감사합니다. 추가 위반 시 시험이 자동 종료됩니다. 이해하셨나요?','확인되었습니다. 면담을 종료하겠습니다. 최선을 다해 응시해 주세요.'];
+    return sims[Math.min(S.chatTurn-1,2)];
+  }
 }
 function typeMsg(role,text){return new Promise(res=>{const c=document.getElementById('chat-msgs');const d=document.createElement('div');d.className='chat-msg cm-'+role;c.appendChild(d);c.scrollTop=c.scrollHeight;if(role==='ai'){const t=document.createElement('div');t.className='typing';t.innerHTML='<div class="tdot"></div><div class="tdot"></div><div class="tdot"></div>';d.appendChild(t);c.scrollTop=c.scrollHeight;setTimeout(()=>{d.innerHTML=text.replace(/\n/g,'<br>');c.scrollTop=c.scrollHeight;res();},900+Math.random()*700);}else{d.textContent=text;c.scrollTop=c.scrollHeight;res();}});}
 window.resumeChat=()=>{document.getElementById('ov-chat').classList.remove('act');S.paused=false;S.gazeAway=false;S.gazeAwayTime=0;clearInterval(S.gazeTimer);_awayFrames=0;_nofaceFrames=0;document.getElementById('exam-content').classList.remove('blurred');setStatus('ok','정상 감독 중');addLog('ok','시험 재개','면담 완료');sendLog('ok','시험 재개','면담 후 재개');if(S.recognition){try{S.recognition.start();}catch(_){}}};
