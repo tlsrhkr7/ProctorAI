@@ -1,9 +1,10 @@
 const API='https://proctorai-production.up.railway.app';
 let studentToken='';
-const S={studentId:'',studentName:'',examId:null,attemptId:null,examName:'',duration:1800,timeLeft:1800,questions:[],answers:{},startTime:null,timerInt:null,warns:0,maxWarns:6,gazeAway:false,gazeAwayTime:0,totalAway:0,gazeTimer:null,gazeThreshold:3,voiceAlerts:0,paused:false,terminated:false,chatTurn:0,chatHistory:[],apiKey:'',recognition:null};
+const S={studentId:'',studentName:'',examId:null,attemptId:null,examName:'',duration:1800,timeLeft:1800,questions:[],answers:{},startTime:null,timerInt:null,cmdPollInt:null,warns:0,maxWarns:6,gazeAway:false,gazeAwayTime:0,totalAway:0,gazeTimer:null,gazeThreshold:3,voiceAlerts:0,paused:false,terminated:false,chatTurn:0,chatHistory:[],apiKey:'',recognition:null};
 // 키워드 목록은 Groq API 없을 때 폴백으로만 사용
 const kwds=['답 알려','정답이 뭐','answer is','solution is','뭐가 정답','몇번이야','몇번인지'];
 let _voiceLastCheck=0; // Groq 음성 분석 쿨다운
+let _lastMsgId=0; // 관리자 메시지 폴링용
 
 // ── API 헬퍼 ──────────────────────────────────────────────
 async function apiCall(method,path,body){
@@ -118,6 +119,8 @@ window.startExam=async function(){
     document.getElementById('p-id').textContent=id;
     renderQs();updateTimer();
     S.timerInt=setInterval(tick,1000);
+    _lastMsgId=0;
+    S.cmdPollInt=setInterval(pollCommands,4000);
     addLog('info','시험 시작',exam.title);
     sendLog('info','시험 시작',exam.title);
     initCam();initVoice();initWindowGuard();
@@ -376,9 +379,51 @@ window.submitExam=async function(){
   showDone(false);
 };
 
+async function pollCommands(){
+  if(!S.attemptId||S.terminated){clearInterval(S.cmdPollInt);return;}
+  try{
+    const r=await apiCall('GET',`/api/student/attempts/${S.attemptId}/commands?since_id=${_lastMsgId}`);
+    // 강제 종료
+    if(r.status==='terminated'&&!S.terminated){terminate('관리자 강제 종료');return;}
+    // 일시정지
+    const pauseOv=document.getElementById('ov-admin-pause');
+    if(r.status==='under_review'&&!S.terminated){
+      if(!pauseOv.classList.contains('act')){
+        S.paused=true;
+        document.getElementById('exam-content').classList.add('blurred');
+        pauseOv.classList.add('act');
+        setStatus('w','관리자 검토 중');
+        addLog('info','관리자 개입','시험 일시정지');
+      }
+    }
+    // 재개 (under_review → in_progress)
+    if(r.status==='in_progress'&&pauseOv.classList.contains('act')){
+      pauseOv.classList.remove('act');
+      S.paused=false;
+      document.getElementById('exam-content').classList.remove('blurred');
+      setStatus('ok','정상 감독 중');
+      addLog('info','시험 재개','관리자 검토 완료');
+    }
+    // 관리자 메시지
+    for(const msg of r.messages){
+      showAdminToast('📨 관리자: '+msg.text);
+      addLog('info','관리자 메시지',msg.text);
+      _lastMsgId=Math.max(_lastMsgId,msg.id);
+    }
+  }catch(e){console.warn('pollCommands:',e);}
+}
+
+function showAdminToast(text){
+  const el=document.getElementById('admin-toast');
+  if(!el)return;
+  el.textContent=text;el.style.display='block';
+  clearTimeout(el._t);
+  el._t=setTimeout(()=>{el.style.display='none';},10000);
+}
+
 async function terminate(reason){
   S.terminated=true;S.paused=true;
-  clearInterval(S.timerInt);
+  clearInterval(S.timerInt);clearInterval(S.cmdPollInt);
   if(S.recognition){try{S.recognition.stop();}catch(_){}}
   ['ov-chat','ov-warn'].forEach(id=>document.getElementById(id).classList.remove('act'));
   addLog('danger','강제 종료',reason);
