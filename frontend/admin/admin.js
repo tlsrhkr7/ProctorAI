@@ -168,7 +168,7 @@ window.generateQs=async function(){
   document.getElementById('q-preview').innerHTML='';
   document.getElementById('save-sec').style.display='none';
   G.genQs=[];
-  const prompt=`이 PDF 페이지 이미지들을 분석하여 ${diff} 난이도의 4지선다 객관식 문제 ${qcnt}개를 생성하세요.\n\n반드시 아래 JSON 형식으로만 응답 (다른 텍스트 절대 없이):\n{"questions":[{"question":"문제 내용","options":["① 보기1","② 보기2","③ 보기3","④ 보기4"],"answer":0,"explanation":"해설"}]}\nanswer는 정답 index(0~3). 반드시 한국어로 작성.`;
+  const prompt=`이미지의 교육 자료를 분석하여 ${diff} 난이도 4지선다 문제 ${qcnt}개를 만드세요.\n\n출력 규칙:\n- JSON 외 다른 텍스트 일절 금지\n- 아래 형식 그대로 출력\n\n{"questions":[{"question":"문제","options":["보기1","보기2","보기3","보기4"],"answer":0,"explanation":"해설"}]}\n\nanswer=정답 인덱스(0~3). 한국어 필수.`;
   // 이미지 content 배열 구성 (페이지별 이미지 + 텍스트 프롬프트)
   const imgContents=G.pdfImages.map(b64=>({type:'image_url',image_url:{url:`data:image/jpeg;base64,${b64}`}}));
   try{
@@ -177,33 +177,19 @@ window.generateQs=async function(){
       method:'POST',
       headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},
       body:JSON.stringify({
-        model:'meta-llama/llama-4-scout-17b-16e-instruct', // Vision 지원 모델
+        model:'meta-llama/llama-4-scout-17b-16e-instruct',
         max_tokens:8000,
-        temperature:.7,
+        temperature:.2,
         messages:[{role:'user',content:[...imgContents,{type:'text',text:prompt}]}]
       })
     });
     prog(true,'응답 파싱 중...',80);
     const data=await res.json();
     if(!res.ok)throw new Error(data.error?.message||'API 오류 '+res.status);
-    let raw=data.choices[0].message.content.trim().replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
-    const jsonMatch=raw.match(/\{[\s\S]*\}/);
-    if(!jsonMatch)throw new Error('JSON 형식 응답을 찾을 수 없습니다');
-    raw=jsonMatch[0];
-    const sanitized=raw.replace(/("(?:[^"\\]|\\.)*")/g,m=>m.replace(/\n/g,'\\n').replace(/\r/g,'\\r').replace(/\t/g,'\\t'));
-    let parsed;
-    try{
-      parsed=JSON.parse(sanitized);
-    }catch(e1){
-      const partialMatch=sanitized.match(/"questions"\s*:\s*(\[[\s\S]*)/);
-      if(!partialMatch)throw new Error('JSON 파싱 실패: '+e1.message);
-      let arr=partialMatch[1];
-      const lastBrace=arr.lastIndexOf('}');
-      if(lastBrace===-1)throw new Error('완성된 문제가 없습니다');
-      arr=arr.substring(0,lastBrace+1)+']';
-      try{parsed={questions:JSON.parse(arr)};}
-      catch(e2){throw new Error('JSON 파싱 실패 (복구 불가): '+e1.message);}
-    }
+    const rawContent=data.choices[0].message.content;
+    console.log('[AI RAW]',rawContent); // 디버그용
+    const parsed=parseAIResponse(rawContent);
+    if(!parsed||!parsed.questions?.length)throw new Error('문제 파싱 실패 — 콘솔(F12)에서 AI 응답 확인');
     G.genQs=parsed.questions;
     prog(true,'완료!',100);setTimeout(()=>prog(false),500);
     renderQPreview(G.genQs);
@@ -212,6 +198,35 @@ window.generateQs=async function(){
   }catch(e){prog(false);document.getElementById('gen-status').textContent='❌ 실패: '+e.message;}
   document.getElementById('gen-btn').disabled=false;
 };
+
+function parseAIResponse(raw){
+  // 1) 코드블록 제거
+  let s=raw.replace(/```json[\s\S]*?```/gi,m=>m.replace(/```json\s*/i,'').replace(/```\s*$/,'')).replace(/```[\s\S]*?```/g,m=>m.slice(3,-3)).trim();
+  // 2) JSON 블록 후보 모두 추출 (가장 긴 것 사용)
+  const candidates=[...s.matchAll(/\{[\s\S]*?\}/g),...s.matchAll(/\{[\s\S]*\}/g)];
+  const blocks=candidates.map(m=>m[0]).sort((a,b)=>b.length-a.length);
+  for(const block of blocks){
+    try{const p=JSON.parse(block);if(p.questions?.length)return p;}catch(_){}
+  }
+  // 3) questions 배열만 추출 시도
+  const arrMatch=s.match(/"questions"\s*:\s*(\[[\s\S]*)/);
+  if(arrMatch){
+    let arr=arrMatch[1];
+    // 마지막 완전한 객체까지만
+    let depth=0,end=-1;
+    for(let i=0;i<arr.length;i++){
+      if(arr[i]==='{')depth++;
+      else if(arr[i]==='}'){depth--;if(depth===0)end=i;}
+    }
+    if(end>-1){
+      try{const qs=JSON.parse(arr.substring(0,end+1)+']');if(Array.isArray(qs)&&qs.length)return{questions:qs};}catch(_){}
+    }
+  }
+  // 4) 개별 question 객체 배열로 수집
+  const qObjs=[...s.matchAll(/\{"question"[\s\S]*?\}/g)].map(m=>{try{return JSON.parse(m[0]);}catch(_){return null;}}).filter(Boolean);
+  if(qObjs.length)return{questions:qObjs};
+  return null;
+}
 
 function prog(show,step='',pct=0){
   document.getElementById('gen-prog').style.display=show?'block':'none';
