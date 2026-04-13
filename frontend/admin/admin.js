@@ -174,7 +174,7 @@ window.generateQs=async function(){
     '어려움':'개념 간 관계 분석, 응용, 추론이 필요한 문제. 자료를 깊이 이해하고 응용해야 하는 수준.'
   };
   const sysPrompt=`You are a JSON-only exam question generator. Output ONLY valid JSON, no markdown, no explanation. Format: {"questions":[{"question":"...","options":["...","...","...","..."],"answer":0,"explanation":"..."}]}`;
-  const userPrompt=`이미지의 교육 자료를 분석하여 ${diff} 난이도(${diffGuide[diff]||diff}) 4지선다 문제 ${qcnt}개를 생성하세요. 한국어. answer는 정답 인덱스(0~3).`;
+  const userPrompt=`이미지의 교육 자료를 분석하여 ${diff} 난이도(${diffGuide[diff]||diff}) 4지선다 문제를 최대한 ${qcnt}개 생성하세요. 자료가 부족하면 가능한 만큼만 생성해도 됩니다. 한국어. answer는 정답 인덱스(0~3).`;
   const imgContents=G.pdfImages.map(b64=>({type:'image_url',image_url:{url:`data:image/jpeg;base64,${b64}`}}));
   try{
     prog(true,'Vision AI가 이미지 분석 중...',45);
