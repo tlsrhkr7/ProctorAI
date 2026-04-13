@@ -61,6 +61,17 @@ window.doRegister=async function(){
   }catch(e){document.getElementById('lm-err').textContent='❌ '+e.message;}
 };
 
+window.doLogout=function(){
+  if(!confirm('로그아웃 하시겠습니까?'))return;
+  token='';
+  localStorage.removeItem('admin_token');
+  if(_pollTimer){clearInterval(_pollTimer);_pollTimer=null;}
+  document.getElementById('login-modal').style.display='flex';
+  document.getElementById('lm-name').value='';
+  document.getElementById('lm-pw').value='';
+  document.getElementById('lm-err').textContent='';
+};
+
 // ── 데이터 패치 ───────────────────────────────────────────
 async function fetchExams(){
   const rows=await api('GET','/api/exams');
