@@ -246,15 +246,30 @@ function initVoice(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){addLog('warn','음성','미지원');return;}
   const rec=new SR();rec.lang='ko-KR';rec.continuous=true;rec.interimResults=true;
   rec.onstart=()=>{document.getElementById('v-status').textContent='감지 중';document.querySelectorAll('.wave-bar').forEach(b=>b.classList.add('act'));addLog('ok','음성','마이크 활성화');};
+  let _lastVoiceLog='';let _interimTimer=null;
   rec.onresult=async e=>{
     if(S.paused||S.terminated)return;
-    let t='';let finalSpeech=false;
-    for(let i=e.resultIndex;i<e.results.length;i++){t+=e.results[i][0].transcript;if(e.results[i].isFinal)finalSpeech=true;}
-    if(!t.trim())return;
-    document.getElementById('v-txt').textContent=`"${t}"`;
-    // 확정된 발언만 기록 (interim 무시)
-    if(finalSpeech&&t.trim().length>1){
-      sendLog('info','음성 기록',t.trim());
+    let finalTxt='';let interimTxt='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      if(e.results[i].isFinal)finalTxt+=e.results[i][0].transcript;
+      else interimTxt+=e.results[i][0].transcript;
+    }
+    const display=(finalTxt||interimTxt).trim();
+    if(!display)return;
+    document.getElementById('v-txt').textContent=`"${display}"`;
+    // 확정 결과 즉시 저장
+    if(finalTxt.trim().length>1&&finalTxt.trim()!==_lastVoiceLog){
+      _lastVoiceLog=finalTxt.trim();
+      if(_interimTimer){clearTimeout(_interimTimer);_interimTimer=null;}
+      sendLog('info','음성 기록',finalTxt.trim());
+    }
+    // interim이 3초 이상 유지되면 저장 (확정 안 되는 경우 대비)
+    if(interimTxt.trim().length>3){
+      clearTimeout(_interimTimer);
+      _interimTimer=setTimeout(()=>{
+        const txt=interimTxt.trim();
+        if(txt&&txt!==_lastVoiceLog){_lastVoiceLog=txt;sendLog('info','음성 기록',txt);}
+      },3000);
     }
   };
   rec.onerror=e=>{if(e.error!=='no-speech')addLog('warn','음성 오류',e.error);};
