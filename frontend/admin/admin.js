@@ -93,7 +93,7 @@ async function fetchSettings(){
 
 async function loadAll(){
   try{
-    await Promise.all([fetchExams(), fetchSettings()]);
+    await Promise.all([fetchExams(), fetchLogs(), fetchSettings()]);
     renderDash();
     if(_pollTimer)clearInterval(_pollTimer);
     _pollTimer=setInterval(poll,5000);
@@ -102,7 +102,7 @@ async function loadAll(){
 
 async function poll(){
   try{
-    await fetchExams();
+    await Promise.all([fetchExams(), fetchLogs()]);
     renderDash();
     const activePage=document.querySelector('.page.on');
     if(!activePage)return;
@@ -455,8 +455,15 @@ window.interveneAction = async function(type) {
 function renderDash(){
   document.getElementById('d-exams').textContent=G.exams.length;
   document.getElementById('d-active').textContent=G.exams.filter(e=>e.status==='active').length;
-  document.getElementById('d-warns').textContent=G.logs.filter(l=>l.severity==='warn'||l.severity==='danger').length;
-  document.getElementById('d-term').textContent=G.logs.filter(l=>l.event&&l.event.includes('강제 종료')).length;
+  // 오늘 날짜 기준 경고 수
+  const todayStr=new Date().toLocaleDateString('ko-KR');
+  const todayWarns=G.logs.filter(l=>{
+    if(l.severity!=='warn'&&l.severity!=='danger')return false;
+    if(!l.timestamp)return true;
+    return new Date(l.timestamp).toLocaleDateString('ko-KR')===todayStr;
+  });
+  document.getElementById('d-warns').textContent=todayWarns.length;
+  document.getElementById('d-term').textContent=G.logs.filter(l=>l.event&&(l.event.includes('강제 종료')||l.event.includes('terminated'))).length;
   document.getElementById('d-examlist').innerHTML=G.exams.map(e=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(30,42,61,.4)"><span style="font-size:13px;font-weight:600">${e.title}</span><span class="badge ${e.status==='active'?'bg':'bb'}">${e.status==='active'?'진행중':'대기'}</span></div>`).join('')||'<div style="font-size:12px;color:var(--muted)">시험을 먼저 생성하세요</div>';
   // 최근 경고 응시자
   const warnStudents = G.logs.filter(l => l.severity === 'warn' || l.severity === 'danger')
