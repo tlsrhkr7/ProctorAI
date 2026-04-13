@@ -130,6 +130,14 @@ window.startExam=async function(){
   }
 };
 
+function renderMath(){
+  if(typeof renderMathInElement==='function'){
+    renderMathInElement(document.getElementById('q-area'),{
+      delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],
+      throwOnError:false
+    });
+  }
+}
 function renderQs(){
   const a=document.getElementById('q-area');a.innerHTML='';
   S.questions.forEach((q,i)=>{
@@ -138,6 +146,7 @@ function renderQs(){
     d.innerHTML=`<div class="q-num">문제 ${String(i+1).padStart(2,'0')}</div><div class="q-text">${q.text}</div><div class="q-options">${opts.map((o,oi)=>`<div class="q-option" id="opt-${i}-${oi}" onclick="selOpt(${i},${oi},${q.id})"><div class="opt-l">${['A','B','C','D'][oi]}</div>${o}</div>`).join('')}</div>`;
     a.appendChild(d);
   });
+  renderMath();
 }
 window.selOpt=(qi,oi,qid)=>{
   document.querySelectorAll(`[id^="opt-${qi}-"]`).forEach(e=>e.classList.remove('sel'));
