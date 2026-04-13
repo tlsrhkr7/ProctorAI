@@ -82,7 +82,10 @@ async def exam_results(exam_id: int, user: dict = Depends(require_admin)):
         await cur.execute(
             """SELECT a.id AS attempt_id, a.user_id, u.name AS user_name,
                       a.status, a.score, a.warning_count, a.total_away_time,
-                      a.voice_alerts, a.started_at, a.submitted_at
+                      a.voice_alerts, a.started_at, a.submitted_at,
+                      (SELECT pl.detail FROM proctoring_logs pl
+                        WHERE pl.attempt_id = a.id AND pl.event = '응시자 정보'
+                        ORDER BY pl.id ASC LIMIT 1) AS real_name
                  FROM attempts a
                  JOIN users u ON a.user_id = u.id
                 WHERE a.exam_id = %s

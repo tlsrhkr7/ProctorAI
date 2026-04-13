@@ -17,7 +17,10 @@ async def live_students(user: dict = Depends(require_admin)):
                       a.exam_id, e.title AS exam_title,
                       a.status, a.warning_count, a.started_at,
                       pl.event AS last_event, pl.severity AS last_severity,
-                      pl.timestamp AS last_timestamp
+                      pl.timestamp AS last_timestamp,
+                      (SELECT detail FROM proctoring_logs
+                        WHERE attempt_id = a.id AND event = '응시자 정보'
+                        ORDER BY id ASC LIMIT 1) AS real_name
                  FROM attempts a
                  JOIN users u ON a.user_id = u.id
                  JOIN exams e ON a.exam_id = e.id
