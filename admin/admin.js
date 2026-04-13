@@ -204,13 +204,40 @@ window.generateQs=async function(){
   document.getElementById('gen-btn').disabled=false;
 };
 
+// 문자 단위로 JSON 문자열 내 잘못된 이스케이프 수정
 function fixJsonStr(s){
-  // 잘못된 이스케이프 시퀀스 제거 (유효한 것만 남김)
-  return s.replace(/\\(?!["\\/bfnrtu])/g,'\\\\')
-          // 문자열 내 raw 개행 이스케이프
-          .replace(/("(?:[^"\\]|\\.)*")/g,m=>
-            m.replace(/\n/g,'\\n').replace(/\r/g,'\\r').replace(/\t/g,'\\t')
-          );
+  const VALID_ESC=new Set(['"','\\','/','b','f','n','r','t']);
+  let out='',i=0;
+  while(i<s.length){
+    const c=s[i];
+    if(c==='"'){
+      // 문자열 구간 — 내부를 문자 단위로 처리
+      out+='"';i++;
+      while(i<s.length){
+        const sc=s[i];
+        if(sc==='\\'){
+          const nx=s[i+1]||'';
+          if(VALID_ESC.has(nx)){
+            out+=sc+nx;i+=2;
+          } else if(nx==='u'){
+            // \uXXXX 검증
+            const hex=s.slice(i+2,i+6);
+            if(/^[0-9a-fA-F]{4}$/.test(hex)){out+=s.slice(i,i+6);i+=6;}
+            else{out+='\\\\';i++;}// 유효하지 않으면 이스케이프
+          } else {
+            out+='\\\\';i++;// 잘못된 이스케이프 → \\로 치환
+          }
+        } else if(sc==='\n'){out+='\\n';i++;}
+        else if(sc==='\r'){out+='\\r';i++;}
+        else if(sc==='\t'){out+='\\t';i++;}
+        else if(sc==='"'){out+='"';i++;break;}
+        else{out+=sc;i++;}
+      }
+    } else {
+      out+=c;i++;
+    }
+  }
+  return out;
 }
 function tryParse(s){
   try{return JSON.parse(s);}catch(_){}
