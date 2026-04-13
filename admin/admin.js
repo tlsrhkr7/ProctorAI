@@ -168,7 +168,12 @@ window.generateQs=async function(){
   document.getElementById('q-preview').innerHTML='';
   document.getElementById('save-sec').style.display='none';
   G.genQs=[];
-  const prompt=`이미지의 교육 자료를 분석하여 ${diff} 난이도 4지선다 문제 ${qcnt}개를 만드세요.\n\n출력 규칙:\n- JSON 외 다른 텍스트 일절 금지\n- 아래 형식 그대로 출력\n\n{"questions":[{"question":"문제","options":["보기1","보기2","보기3","보기4"],"answer":0,"explanation":"해설"}]}\n\nanswer=정답 인덱스(0~3). 한국어 필수.`;
+  const diffGuide={
+    '쉬움':'기본 개념과 용어를 묻는 단순 암기형 문제. 자료에서 직접 답을 찾을 수 있는 수준.',
+    '보통':'개념 이해와 간단한 적용을 요구하는 문제. 자료를 이해해야 풀 수 있는 수준.',
+    '어려움':'개념 간 관계 분석, 응용, 추론이 필요한 문제. 자료를 깊이 이해하고 응용해야 하는 수준.'
+  };
+  const prompt=`이미지의 교육 자료를 분석하여 4지선다 문제 ${qcnt}개를 만드세요.\n\n난이도: ${diff}\n기준: ${diffGuide[diff]||diff}\n\n출력 규칙:\n- JSON 외 다른 텍스트 일절 금지\n- 아래 형식 그대로 출력\n\n{"questions":[{"question":"문제","options":["보기1","보기2","보기3","보기4"],"answer":0,"explanation":"해설"}]}\n\nanswer=정답 인덱스(0~3). 한국어 필수.`;
   // 이미지 content 배열 구성 (페이지별 이미지 + 텍스트 프롬프트)
   const imgContents=G.pdfImages.map(b64=>({type:'image_url',image_url:{url:`data:image/jpeg;base64,${b64}`}}));
   try{
