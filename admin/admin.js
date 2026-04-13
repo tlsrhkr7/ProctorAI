@@ -212,35 +212,58 @@ function tryParse(s){
   try{return JSON.parse(fixJsonStr(s));}catch(_){}
   return null;
 }
+// 브레이스 깊이 추적으로 첫 번째 완전한 JSON 객체 위치 반환
+function findJsonBlock(s){
+  let depth=0,start=-1,inStr=false,esc=false;
+  for(let i=0;i<s.length;i++){
+    const c=s[i];
+    if(esc){esc=false;continue;}
+    if(c==='\\'){esc=true;continue;}
+    if(c==='"'){inStr=!inStr;continue;}
+    if(inStr)continue;
+    if(c==='{'){if(depth===0)start=i;depth++;}
+    else if(c==='}'){depth--;if(depth===0&&start!==-1)return s.slice(start,i+1);}
+  }
+  return null;
+}
 function parseAIResponse(raw){
   // 1) 코드블록 제거
   let s=raw.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
-  // 2) 가장 바깥 { } 추출 (greedy)
-  const start=s.indexOf('{'), end=s.lastIndexOf('}');
-  if(start!==-1&&end>start){
-    const block=s.slice(start,end+1);
+  // 2) 브레이스 깊이로 첫 완전한 JSON 객체 추출
+  const block=findJsonBlock(s);
+  if(block){
     const p=tryParse(block);
     if(p?.questions?.length)return p;
   }
-  // 3) questions 배열 직접 추출
-  const arrMatch=s.match(/"questions"\s*:\s*\[[\s\S]*/);
-  if(arrMatch){
-    let arr=arrMatch[0].replace(/^"questions"\s*:\s*/,'');
-    // 완전한 마지막 } 찾기
-    let depth=0,end2=-1;
-    for(let i=0;i<arr.length;i++){
-      if(arr[i]==='{')depth++;
-      else if(arr[i]==='}'){depth--;if(depth===0)end2=i;}
+  // 3) questions 배열 직접 추출 — [ 부터 깊이 추적
+  const qStart=s.search(/"questions"\s*:\s*\[/);
+  if(qStart!==-1){
+    const arrStart=s.indexOf('[',qStart);
+    let depth=0,end=-1,inStr=false,esc=false;
+    for(let i=arrStart;i<s.length;i++){
+      const c=s[i];
+      if(esc){esc=false;continue;}
+      if(c==='\\'){esc=true;continue;}
+      if(c==='"'){inStr=!inStr;continue;}
+      if(inStr)continue;
+      if(c==='[')depth++;
+      else if(c===']'){depth--;if(depth===0){end=i;break;}}
     }
-    if(end2>-1){
-      const candidate=arr.substring(0,end2+1)+']';
-      const qs=tryParse(candidate);
+    if(end!==-1){
+      const qs=tryParse(s.slice(arrStart,end+1));
       if(Array.isArray(qs)&&qs.length)return{questions:qs};
     }
   }
-  // 4) 개별 {"question":...} 객체 수집
-  const qObjs=[...s.matchAll(/\{[^{}]*"question"[^{}]*\}/g)]
-    .map(m=>tryParse(m[0])).filter(q=>q?.question&&q?.options);
+  // 4) 개별 question 객체 수집 (최후 수단)
+  const qObjs=[];
+  let remain=s;
+  while(true){
+    const b=findJsonBlock(remain);
+    if(!b)break;
+    const q=tryParse(b);
+    if(q?.question&&q?.options)qObjs.push(q);
+    remain=remain.slice(remain.indexOf(b)+b.length);
+  }
   if(qObjs.length)return{questions:qObjs};
   return null;
 }
