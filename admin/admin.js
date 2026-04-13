@@ -410,7 +410,7 @@ async function renderMonitor(){
     const col=pct>70?'var(--ok)':pct>40?'var(--warn)':'var(--danger)';
     const lastTime=s.last_timestamp?new Date(s.last_timestamp).toLocaleTimeString('ko'):'';
     return `<div class="stu-card ${warns>=3?'dc':warns>=1?'wc':''}">
-      <div class="stu-top"><div><div class="stu-name">${s.user_name}</div><div class="stu-id">${s.exam_title}</div></div>
+      <div class="stu-top"><div><div class="stu-name">${parseRealName(s.real_name)||s.user_name}</div><div class="stu-id">${parseRealName(s.real_name)?s.user_name+' · ':'' }${s.exam_title}</div></div>
       <div>${warns>0?`<span class="badge bw">⚠ ${warns}회</span>`:'<span class="badge bg">정상</span>'}</div></div>
       <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px"><span style="color:var(--muted)">집중도</span><span style="color:${col}">${pct}%</span></div>
       <div class="mini-bar"><div class="mini-fill" style="width:${pct}%;background:${col}"></div></div>
@@ -534,7 +534,7 @@ window.loadResults=async function(){
     const sc={submitted:'bg',terminated:'bd',in_progress:'bw',under_review:'bm'};
     const st={submitted:'제출완료',terminated:'강제종료',in_progress:'응시중',under_review:'검토중'};
     tb.innerHTML=rows.map(r=>`<tr>
-      <td><strong>${r.user_name}</strong><div style="font-size:10px;color:var(--muted)">학번</div></td>
+      <td>${nameCell(r)}</td>
       <td><span class="badge ${sc[r.status]||'bb'}">${st[r.status]||r.status}</span></td>
       <td style="font-weight:700;color:${r.score>=80?'var(--ok)':r.score>=60?'var(--warn)':'var(--danger)'}">${r.score!=null?r.score+'점':'-'}</td>
       <td style="font-weight:700;color:${(r.warning_count||0)>=3?'var(--danger)':(r.warning_count||0)>=2?'var(--warn)':'var(--text)'}">${r.warning_count||0}회${(r.warning_count||0)>=3?' 🚨':''}</td>
@@ -732,11 +732,36 @@ window.showResultDetail = async function(attemptId, userName) {
   }
 };
 
+// ── 이름 표시 헬퍼 ───────────────────────────────────────
+function parseRealName(realName){
+  if(!realName) return null;
+  // "이름: 홍길동 / 학번: 2021042001" 파싱
+  const m = realName.match(/이름:\s*([^/]+)/);
+  return m ? m[1].trim() : realName;
+}
+function nameCell(r){
+  const rn = parseRealName(r.real_name);
+  if(rn) return `<strong>${rn}</strong><div style="font-size:10px;color:var(--muted)">${r.user_name}</div>`;
+  return `<strong>${r.user_name}</strong><div style="font-size:10px;color:var(--muted)">학번</div>`;
+}
+
+// ── KaTeX 수식 렌더링 ─────────────────────────────────────
+function renderAdminMath(el){
+  if(typeof renderMathInElement==='function'){
+    renderMathInElement(el,{
+      delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],
+      throwOnError:false
+    });
+  }
+}
+
 window.switchTab = function(name) {
   ['answers','events','voice','chat'].forEach(t => {
     document.getElementById('rm-tab-' + t).style.display = t === name ? 'block' : 'none';
     document.getElementById('tab-' + t).classList.toggle('on', t === name);
   });
+  // 답안 탭 전환 시 수식 렌더링
+  if(name==='answers') renderAdminMath(document.getElementById('rm-tab-answers'));
 };
 
 window.closeResultModal=()=>{document.getElementById('res-modal').style.display='none';};
