@@ -123,7 +123,8 @@ window.startExam=async function(){
     _lastMsgId=0;
     S.cmdPollInt=setInterval(pollCommands,4000);
     addLog('info','시험 시작',exam.title);
-    sendLog('info','시험 시작',exam.title);
+    sendLog('info','시험 시작',`${exam.title} | 응시자: ${name}(${id})`);
+    sendLog('info','응시자 정보',`이름: ${name} / 학번: ${id}`);
     initCam();initVoice();initWindowGuard();
   }catch(e){
     alert('시험 시작 실패: '+e.message);
@@ -221,7 +222,17 @@ function updateGaze(away,val){
   if(stableAway&&!S.gazeAway){S.gazeAway=true;S.gazeAwayTime=0;S.gazeTimer=setInterval(()=>{if(!S.gazeAway||S.paused||S.terminated){clearInterval(S.gazeTimer);return;}S.gazeAwayTime++;S.totalAway++;document.getElementById('st-away').textContent=S.totalAway+'s';if(S.gazeAwayTime>=S.gazeThreshold){gazeWarn();clearInterval(S.gazeTimer);}},1000);}
   else if(!stableAway&&S.gazeAway){S.gazeAway=false;S.gazeAwayTime=0;clearInterval(S.gazeTimer);}
 }
-function gazeWarn(){S.warns++;updateWB();addLog('warn','시선 이탈',`${S.gazeThreshold}초+ (경고 ${S.warns}/${S.maxWarns})`);sendLog('warn','시선 이탈',`${S.gazeThreshold}초+ 이탈 — 경고 ${S.warns}회`);const we=document.getElementById('st-warns');we.textContent=S.warns+'회';we.className='sbox-v '+(S.warns>=S.maxWarns?'d':'w');if(S.warns>=S.maxWarns){terminate('경고 누적 — 0점 퇴장');}else if(S.warns%2===0){startChat('gaze');}else{showWarn('시선 이탈 감지',`화면을 ${S.gazeThreshold}초 이상 이탈했습니다.\n경고 ${S.warns}회`);flash('w');}}
+function gazeWarn(){
+  S.warns++;updateWB();
+  const isNoFace=_nofaceFrames>=NOFACE_FRAME_THRESHOLD;
+  const evtName=isNoFace?'얼굴 미감지':'시선 이탈';
+  addLog('warn',evtName,`${S.gazeThreshold}초+ (경고 ${S.warns}/${S.maxWarns})`);
+  sendLog('warn',evtName,`${S.gazeThreshold}초+ ${evtName} — 경고 ${S.warns}회`);
+  const we=document.getElementById('st-warns');we.textContent=S.warns+'회';we.className='sbox-v '+(S.warns>=S.maxWarns?'d':'w');
+  if(S.warns>=S.maxWarns){terminate('경고 누적 — 0점 퇴장');}
+  else if(S.warns%2===0){startChat(isNoFace?'noface':'gaze');}
+  else{showWarn(evtName+' 감지',`${isNoFace?'카메라에 얼굴이 감지되지 않습니다.':'화면을 '+S.gazeThreshold+'초 이상 이탈했습니다.'}\n경고 ${S.warns}회`);flash('w');}
+}
 
 // ── Groq 음성 분석 (백엔드 프록시 — 키 노출 없음) ─────────
 async function analyzeVoiceGroq(text){

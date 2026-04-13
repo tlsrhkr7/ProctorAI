@@ -534,7 +534,7 @@ window.loadResults=async function(){
     const sc={submitted:'bg',terminated:'bd',in_progress:'bw',under_review:'bm'};
     const st={submitted:'제출완료',terminated:'강제종료',in_progress:'응시중',under_review:'검토중'};
     tb.innerHTML=rows.map(r=>`<tr>
-      <td><strong>${r.user_name}</strong></td>
+      <td><strong>${r.user_name}</strong><div style="font-size:10px;color:var(--muted)">학번</div></td>
       <td><span class="badge ${sc[r.status]||'bb'}">${st[r.status]||r.status}</span></td>
       <td style="font-weight:700;color:${r.score>=80?'var(--ok)':r.score>=60?'var(--warn)':'var(--danger)'}">${r.score!=null?r.score+'점':'-'}</td>
       <td style="font-weight:700;color:${(r.warning_count||0)>=3?'var(--danger)':(r.warning_count||0)>=2?'var(--warn)':'var(--text)'}">${r.warning_count||0}회${(r.warning_count||0)>=3?' 🚨':''}</td>
@@ -550,6 +550,7 @@ window.showResultDetail = async function(attemptId, userName) {
   const modal = document.getElementById('res-modal');
   modal.style.display = 'flex';
   document.getElementById('rm-title').textContent = `${userName} — 상세 결과`;
+  document.getElementById('rm-title').dataset.attemptId = attemptId;
   document.getElementById('rm-sub').textContent = '';
   document.getElementById('rm-stats').innerHTML = '<div style="color:var(--muted);font-size:12px;grid-column:1/-1">불러오는 중...</div>';
   ['rm-answers','rm-events','rm-voice','rm-chat'].forEach(id => document.getElementById(id).innerHTML = '');
@@ -558,6 +559,8 @@ window.showResultDetail = async function(attemptId, userName) {
     const r = await api('GET', `/api/admin/attempts/${attemptId}/result`);
     const dur = r.submitted_at && r.started_at ? Math.round((new Date(r.submitted_at) - new Date(r.started_at)) / 1000) : null;
     document.getElementById('rm-sub').textContent = r.exam_title;
+    // 백엔드에서 받은 실제 이름으로 타이틀 업데이트
+    if(r.user_name) document.getElementById('rm-title').textContent = `${r.user_name} — 상세 결과`;
     document.getElementById('rm-stats').innerHTML = [
       ['점수', r.score != null ? r.score + '점' : '-', r.score >= 80 ? 'var(--ok)' : r.score >= 60 ? 'var(--warn)' : 'var(--danger)'],
       ['경고', `${r.warning_count || 0}회`, (r.warning_count || 0) >= 4 ? 'var(--danger)' : 'var(--warn)'],
@@ -597,29 +600,87 @@ window.showResultDetail = async function(attemptId, userName) {
     const allLogs = await api('GET', `/api/admin/attempts/${attemptId}/logs`);
     const chatLogs = allLogs.filter(l => l.event && l.event.startsWith('AI 면담'));
     const voiceLogs = allLogs.filter(l => l.event === '음성 기록');
-    const eventLogs = allLogs.filter(l => l.event && !l.event.startsWith('AI 면담') && l.event !== '음성 기록');
+    const eventLogs = allLogs.filter(l => l.event && !l.event.startsWith('AI 면담') && l.event !== '음성 기록' && l.event !== '응시자 정보');
+    // 응시자 실명 파싱 (시험 시작 시 기록)
+    const infoLog = allLogs.find(l => l.event === '응시자 정보');
+    if(infoLog && infoLog.detail){
+      document.getElementById('rm-title').textContent = `${infoLog.detail} — 상세 결과`;
+    } else if(r.user_name){
+      document.getElementById('rm-title').textContent = `${r.user_name} — 상세 결과`;
+    }
 
-    // 탭2: 이벤트
+    // 탭2: 이벤트 — 카테고리 요약 + 타임라인
     if (eventLogs.length) {
-      const sevIcon = {danger:'🚨',warn:'⚠️',ok:'✅',info:'ℹ️'};
+      // 카테고리 분류
+      const cats = {
+        '시선 이탈':    {icon:'👁',color:'var(--warn)',   logs:[]},
+        '얼굴 미감지':  {icon:'🙈',color:'var(--danger)', logs:[]},
+        '화면 이탈':    {icon:'🖥',color:'var(--warn)',   logs:[]},
+        '음성 경고':    {icon:'🎙',color:'var(--danger)', logs:[]},
+        'AI 면담':      {icon:'🤖',color:'var(--accent2)',logs:[]},
+        '경고':         {icon:'⚠️',color:'var(--warn)',   logs:[]},
+        '기타':         {icon:'ℹ️',color:'var(--muted)',  logs:[]},
+      };
+      eventLogs.forEach(l => {
+        const ev = l.event || '';
+        if(ev.includes('시선 이탈'))        cats['시선 이탈'].logs.push(l);
+        else if(ev.includes('얼굴 미감지')) cats['얼굴 미감지'].logs.push(l);
+        else if(ev.includes('화면 이탈')||ev.includes('화면 복귀')) cats['화면 이탈'].logs.push(l);
+        else if(ev.includes('음성 경고'))   cats['음성 경고'].logs.push(l);
+        else if(ev.includes('AI 면담')||ev.includes('면담')) cats['AI 면담'].logs.push(l);
+        else if(l.severity==='warn'||l.severity==='danger') cats['경고'].logs.push(l);
+        else cats['기타'].logs.push(l);
+      });
+
+      // 요약 배지
+      const summaryHtml = Object.entries(cats)
+        .filter(([,v])=>v.logs.length>0)
+        .map(([name,v])=>`<div style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg3);border-radius:8px;border-left:3px solid ${v.color}">
+          <span>${v.icon}</span>
+          <span style="font-size:12px;font-weight:600;color:${v.color}">${name}</span>
+          <span style="font-size:11px;color:var(--muted);margin-left:auto">${v.logs.length}회</span>
+        </div>`).join('');
+
+      // 타임라인
+      const sevIcon  = {danger:'🚨',warn:'⚠️',ok:'✅',info:'ℹ️'};
       const sevColor = {danger:'var(--danger)',warn:'var(--warn)',ok:'var(--ok)',info:'var(--muted)'};
-      document.getElementById('rm-events').innerHTML = `<div style="display:flex;flex-direction:column;gap:4px">
-        ${eventLogs.map(l => {
-          const ic = sevIcon[l.severity] || '•';
-          const co = sevColor[l.severity] || 'var(--muted)';
-          const ts = l.timestamp ? new Date(l.timestamp).toLocaleTimeString('ko') : '-';
-          return `<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 10px;background:var(--bg3);border-radius:6px;border-left:3px solid ${co}">
-            <span style="font-size:13px;flex-shrink:0">${ic}</span>
-            <div style="flex:1;min-width:0">
-              <div style="display:flex;justify-content:space-between;gap:8px">
-                <span style="font-size:12px;font-weight:700;color:${co}">${l.event || ''}</span>
-                <span style="font-size:10px;color:var(--muted);white-space:nowrap">${ts}</span>
-              </div>
-              ${l.detail ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;word-break:break-all">${l.detail}</div>` : ''}
+      const getCat = ev => {
+        if(!ev)return cats['기타'];
+        if(ev.includes('시선 이탈'))return cats['시선 이탈'];
+        if(ev.includes('얼굴 미감지'))return cats['얼굴 미감지'];
+        if(ev.includes('화면 이탈')||ev.includes('화면 복귀'))return cats['화면 이탈'];
+        if(ev.includes('음성 경고'))return cats['음성 경고'];
+        if(ev.includes('AI 면담')||ev.includes('면담'))return cats['AI 면담'];
+        return cats['기타'];
+      };
+      const timelineHtml = eventLogs.map((l,i) => {
+        const co = sevColor[l.severity]||'var(--muted)';
+        const ic = sevIcon[l.severity]||'•';
+        const ts = l.timestamp ? new Date(l.timestamp).toLocaleTimeString('ko') : '-';
+        const cat = getCat(l.event||'');
+        const isLast = i===eventLogs.length-1;
+        return `<div style="display:flex;gap:0;position:relative">
+          <div style="display:flex;flex-direction:column;align-items:center;margin-right:12px">
+            <div style="width:28px;height:28px;border-radius:50%;background:var(--bg3);border:2px solid ${cat.color};display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">${cat.icon}</div>
+            ${!isLast?`<div style="width:2px;flex:1;min-height:12px;background:var(--border);margin:2px 0"></div>`:''}
+          </div>
+          <div style="flex:1;padding-bottom:${isLast?'0':'12px'}">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+              <span style="font-size:12px;font-weight:700;color:${cat.color}">${l.event||''}</span>
+              <span style="font-size:10px;color:var(--muted);white-space:nowrap">${ts}</span>
             </div>
-          </div>`;
-        }).join('')}
-      </div>`;
+            ${l.detail?`<div style="font-size:11px;color:var(--muted);padding:5px 8px;background:var(--bg3);border-radius:5px;word-break:break-all">${l.detail}</div>`:''}
+          </div>
+        </div>`;
+      }).join('');
+
+      document.getElementById('rm-events').innerHTML = `
+        <div style="margin-bottom:14px">
+          <div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">이벤트 요약</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">${summaryHtml}</div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">타임라인</div>
+        <div>${timelineHtml}</div>`;
     } else {
       document.getElementById('rm-events').innerHTML = '<div style="font-size:12px;color:var(--muted)">이벤트 없음</div>';
     }
