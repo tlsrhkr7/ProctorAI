@@ -11,7 +11,7 @@
 |------|-----|
 | 🎓 응시자 페이지 | https://proctor-ai-nine.vercel.app/user/exam.html |
 | 🖥️ 관리자 대시보드 | https://proctor-ai-nine.vercel.app/admin/admin.html |
-| ⚙️ 백엔드 API | https://proctorai-production.up.railway.app |
+| ⚙️ 백엔드 API | https://proctorai-production.up.railway.app/api/health |
 
 ### 관리자 계정
 ```
